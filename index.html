@@ -1,0 +1,1795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Federated Content Targeting Engine</title>
+
+    <!-- Fonts: Syne for display, Space Mono for code/technical -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================================
+           CSS CUSTOM PROPERTIES (THEME)
+           Dark technical theme with blue/teal (federated)
+           and orange/red (legacy/centralized) accents
+           =========================================== */
+        :root {
+            /* Core palette */
+            --bg-primary: #0b0e17;
+            --bg-secondary: #111827;
+            --bg-card: #161b2e;
+            --text-primary: #e8eaf0;
+            --text-secondary: #8892a8;
+            --text-dim: #4a5568;
+
+            /* Accent: legacy = orange/red, federated = teal/blue */
+            --legacy-color: #f97316;
+            --legacy-dim: rgba(249, 115, 22, 0.15);
+            --legacy-glow: rgba(249, 115, 22, 0.25);
+            --fed-color: #06d6a0;
+            --fed-dim: rgba(6, 214, 160, 0.12);
+            --fed-glow: rgba(6, 214, 160, 0.25);
+            --accent-blue: #38bdf8;
+            --accent-cyan: #22d3ee;
+            --danger-red: #ef4444;
+
+            /* Typography — clamp() for responsive scaling */
+            --font-display: 'Syne', sans-serif;
+            --font-mono: 'Space Mono', monospace;
+            --font-body: 'DM Sans', sans-serif;
+            --title-size: clamp(1.6rem, 4.5vw, 3.2rem);
+            --h2-size: clamp(1.2rem, 3vw, 2rem);
+            --h3-size: clamp(0.9rem, 2vw, 1.3rem);
+            --body-size: clamp(0.7rem, 1.3vw, 1rem);
+            --small-size: clamp(0.6rem, 1vw, 0.8rem);
+            --mono-size: clamp(0.55rem, 0.9vw, 0.75rem);
+
+            /* Spacing */
+            --slide-padding: clamp(1.5rem, 4vw, 4rem);
+            --content-gap: clamp(0.5rem, 1.5vw, 1.5rem);
+            --element-gap: clamp(0.25rem, 0.8vw, 0.75rem);
+
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.6s;
+        }
+
+        /* ===========================================
+           BASE RESET
+           =========================================== */
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* ===========================================
+           VIEWPORT FITTING: MANDATORY BASE STYLES
+           =========================================== */
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+        html {
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-height: 100%;
+            overflow: hidden;
+            padding: var(--slide-padding);
+        }
+        .card, .container, .content-box {
+            max-width: min(90vw, 1000px);
+            max-height: min(80vh, 700px);
+        }
+        .feature-list, .bullet-list {
+            gap: clamp(0.4rem, 1vh, 1rem);
+        }
+        .feature-list li, .bullet-list li {
+            font-size: var(--body-size);
+            line-height: 1.4;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+        }
+        img, .image-container {
+            max-width: 100%;
+            max-height: min(50vh, 400px);
+            object-fit: contain;
+        }
+
+        /* Short viewports */
+        @media (max-height: 700px) {
+            :root {
+                --slide-padding: clamp(0.75rem, 3vw, 2rem);
+                --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+                --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+                --h2-size: clamp(1rem, 3vw, 1.75rem);
+            }
+        }
+        @media (max-height: 600px) {
+            :root {
+                --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+                --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+                --title-size: clamp(1.1rem, 4vw, 2rem);
+                --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+            }
+            .nav-dots, .keyboard-hint, .decorative { display: none; }
+        }
+        @media (max-height: 500px) {
+            :root {
+                --slide-padding: clamp(0.4rem, 2vw, 1rem);
+                --title-size: clamp(1rem, 3.5vw, 1.5rem);
+                --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+                --body-size: clamp(0.65rem, 1vw, 0.85rem);
+            }
+        }
+        @media (max-width: 600px) {
+            :root { --title-size: clamp(1.25rem, 7vw, 2.5rem); }
+            .grid { grid-template-columns: 1fr; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important;
+            }
+            html { scroll-behavior: auto; }
+        }
+
+        /* ===========================================
+           GLOBAL STYLES
+           =========================================== */
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        h1, h2, h3 {
+            font-family: var(--font-display);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        /* ===========================================
+           ANIMATIONS
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity var(--duration-normal) var(--ease-out-expo),
+                        transform var(--duration-normal) var(--ease-out-expo);
+        }
+        .slide.visible .reveal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .reveal:nth-child(1) { transition-delay: 0.05s; }
+        .reveal:nth-child(2) { transition-delay: 0.12s; }
+        .reveal:nth-child(3) { transition-delay: 0.2s; }
+        .reveal:nth-child(4) { transition-delay: 0.28s; }
+        .reveal:nth-child(5) { transition-delay: 0.36s; }
+
+        /* ===========================================
+           PROGRESS BAR
+           =========================================== */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--fed-color), var(--accent-blue));
+            z-index: 1000;
+            transition: width 0.3s ease;
+        }
+
+        /* ===========================================
+           NAV DOTS
+           =========================================== */
+        .nav-dots {
+            position: fixed;
+            right: clamp(0.75rem, 2vw, 1.5rem);
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(6px, 1vh, 10px);
+            z-index: 100;
+        }
+        .nav-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-dim);
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0;
+        }
+        .nav-dot.active {
+            background: var(--fed-color);
+            box-shadow: 0 0 8px var(--fed-glow);
+            transform: scale(1.3);
+        }
+
+        /* ===========================================
+           SLIDE NUMBER
+           =========================================== */
+        .slide-number {
+            position: absolute;
+            top: clamp(0.75rem, 2vw, 1.5rem);
+            left: clamp(1rem, 3vw, 2rem);
+            font-family: var(--font-mono);
+            font-size: var(--small-size);
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+        }
+
+        /* ===========================================
+           SHARED LAYOUT HELPERS
+           =========================================== */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(1rem, 3vw, 3rem);
+            align-items: start;
+        }
+        @media (max-width: 800px) {
+            .two-col { grid-template-columns: 1fr; }
+        }
+
+        .tag {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: var(--small-size);
+            padding: clamp(2px, 0.3vw, 4px) clamp(6px, 0.8vw, 12px);
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+        }
+        .tag-legacy {
+            background: var(--legacy-dim);
+            color: var(--legacy-color);
+            border: 1px solid rgba(249, 115, 22, 0.3);
+        }
+        .tag-fed {
+            background: var(--fed-dim);
+            color: var(--fed-color);
+            border: 1px solid rgba(6, 214, 160, 0.3);
+        }
+
+        /* ===========================================
+           BACKGROUND EFFECTS
+           =========================================== */
+        .grid-bg::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+
+        /* ===========================================
+           SLIDE 1: TITLE
+           =========================================== */
+        .title-slide {
+            background:
+                radial-gradient(ellipse at 25% 75%, rgba(6, 214, 160, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 75% 25%, rgba(56, 189, 248, 0.06) 0%, transparent 50%),
+                var(--bg-primary);
+        }
+        .title-slide .slide-content {
+            justify-content: center;
+            align-items: flex-start;
+            padding-left: clamp(2rem, 8vw, 8rem);
+            gap: var(--content-gap);
+        }
+        .title-slide h1 {
+            font-size: var(--title-size);
+            font-weight: 800;
+            line-height: 1.1;
+            max-width: 16ch;
+            background: linear-gradient(135deg, var(--text-primary) 30%, var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .title-slide .subtitle {
+            font-size: var(--h3-size);
+            color: var(--text-secondary);
+            max-width: 40ch;
+            line-height: 1.5;
+            font-weight: 300;
+        }
+        .title-slide .context-line {
+            font-family: var(--font-mono);
+            font-size: var(--small-size);
+            color: var(--text-dim);
+            margin-top: clamp(0.5rem, 1vw, 1rem);
+            letter-spacing: 0.08em;
+        }
+        .title-rule-badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: var(--mono-size);
+            color: var(--fed-color);
+            background: var(--fed-dim);
+            border: 1px solid rgba(6, 214, 160, 0.2);
+            border-radius: 6px;
+            padding: clamp(4px, 0.5vw, 8px) clamp(8px, 1vw, 16px);
+            margin-top: clamp(0.25rem, 0.5vw, 0.5rem);
+        }
+
+        /* ===========================================
+           SLIDE 2: RULE ENGINE DEEP DIVE
+           =========================================== */
+        .rule-slide {
+            background:
+                radial-gradient(ellipse at 10% 90%, rgba(6, 214, 160, 0.05) 0%, transparent 40%),
+                var(--bg-primary);
+        }
+        .rule-slide .slide-content {
+            gap: clamp(0.4rem, 1.2vw, 1rem);
+        }
+        .rule-slide h2 {
+            font-size: var(--h2-size);
+            margin-bottom: clamp(0.15rem, 0.5vw, 0.5rem);
+        }
+        .rule-expr {
+            font-family: var(--font-mono);
+            font-size: var(--mono-size);
+            color: var(--accent-cyan);
+            background: rgba(34, 211, 238, 0.06);
+            border: 1px solid rgba(34, 211, 238, 0.15);
+            border-radius: 6px;
+            padding: clamp(4px, 0.4vw, 8px) clamp(8px, 1vw, 16px);
+            display: inline-block;
+        }
+
+        /* AST Diagram */
+        .ast-diagram {
+            display: flex;
+            gap: clamp(1rem, 2.5vw, 3rem);
+            align-items: flex-start;
+        }
+        .ast-tree {
+            flex: 1.2;
+            min-width: 0;
+        }
+        .ast-tree svg {
+            width: 100%;
+            height: auto;
+            max-height: min(52vh, 420px);
+        }
+        .batch-flow {
+            flex: 0.8;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.3rem, 0.8vw, 0.6rem);
+        }
+        .batch-card {
+            border-radius: 8px;
+            padding: clamp(6px, 0.8vw, 12px) clamp(8px, 1vw, 16px);
+            font-size: var(--small-size);
+            line-height: 1.5;
+        }
+        .batch-card-legacy {
+            background: var(--legacy-dim);
+            border-left: 3px solid var(--legacy-color);
+        }
+        .batch-card-fed {
+            background: var(--fed-dim);
+            border-left: 3px solid var(--fed-color);
+        }
+        .batch-card .label {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: var(--small-size);
+            margin-bottom: 2px;
+        }
+        .batch-card-legacy .label { color: var(--legacy-color); }
+        .batch-card-fed .label { color: var(--fed-color); }
+        .batch-card .desc {
+            color: var(--text-secondary);
+            font-size: var(--mono-size);
+            font-family: var(--font-mono);
+        }
+        .composition-modes {
+            display: flex;
+            gap: clamp(0.5rem, 1vw, 1rem);
+            margin-top: clamp(0.15rem, 0.4vw, 0.3rem);
+        }
+        .mode-pill {
+            font-family: var(--font-mono);
+            font-size: var(--mono-size);
+            padding: clamp(3px, 0.3vw, 5px) clamp(8px, 0.8vw, 14px);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .mode-parallel {
+            background: var(--fed-dim);
+            color: var(--fed-color);
+            border: 1px solid rgba(6, 214, 160, 0.2);
+        }
+        .mode-sequential {
+            background: var(--legacy-dim);
+            color: var(--legacy-color);
+            border: 1px solid rgba(249, 115, 22, 0.2);
+        }
+
+        /* ===========================================
+           SLIDE 3: CENTRALIZED PROBLEM
+           =========================================== */
+        .problem-slide {
+            background:
+                radial-gradient(ellipse at 80% 20%, rgba(249, 115, 22, 0.06) 0%, transparent 45%),
+                var(--bg-primary);
+        }
+        .problem-slide .slide-content {
+            gap: clamp(0.4rem, 1vw, 1rem);
+        }
+        .problem-slide h2 {
+            font-size: var(--h2-size);
+            color: var(--legacy-color);
+        }
+        .arch-diagram svg {
+            width: 100%;
+            max-height: min(28vh, 220px);
+        }
+        .problems-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+            gap: clamp(0.4rem, 0.8vw, 0.75rem);
+        }
+        .problem-card {
+            background: rgba(249, 115, 22, 0.04);
+            border: 1px solid rgba(249, 115, 22, 0.12);
+            border-radius: 8px;
+            padding: clamp(6px, 0.8vw, 12px);
+        }
+        .problem-card .problem-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: var(--small-size);
+            color: var(--legacy-color);
+            margin-bottom: 3px;
+        }
+        .problem-card .problem-desc {
+            font-size: var(--mono-size);
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* ===========================================
+           SLIDE 4: FEDERATED SOLUTION
+           =========================================== */
+        .solution-slide {
+            background:
+                radial-gradient(ellipse at 20% 80%, rgba(6, 214, 160, 0.06) 0%, transparent 45%),
+                radial-gradient(ellipse at 80% 30%, rgba(56, 189, 248, 0.04) 0%, transparent 40%),
+                var(--bg-primary);
+        }
+        .solution-slide .slide-content {
+            gap: clamp(0.4rem, 1vw, 1rem);
+        }
+        .solution-slide h2 {
+            font-size: var(--h2-size);
+            color: var(--fed-color);
+        }
+        .fed-arch svg {
+            width: 100%;
+            max-height: min(24vh, 200px);
+        }
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--mono-size);
+            font-family: var(--font-mono);
+        }
+        .comparison-table th {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: var(--small-size);
+            padding: clamp(4px, 0.5vw, 8px) clamp(6px, 0.8vw, 12px);
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .comparison-table th:nth-child(2) { color: var(--legacy-color); }
+        .comparison-table th:nth-child(3) { color: var(--fed-color); }
+        .comparison-table td {
+            padding: clamp(3px, 0.4vw, 6px) clamp(6px, 0.8vw, 12px);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        .comparison-table td:first-child {
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-weight: 500;
+            font-size: var(--small-size);
+        }
+
+        /* ===========================================
+           SLIDE 5: CUSTOMER IMPACT
+           =========================================== */
+        .impact-slide {
+            background:
+                radial-gradient(ellipse at 50% 80%, rgba(6, 214, 160, 0.06) 0%, transparent 50%),
+                var(--bg-primary);
+        }
+        .impact-slide .slide-content {
+            gap: clamp(0.5rem, 1.2vw, 1.2rem);
+        }
+        .impact-slide h2 { font-size: var(--h2-size); }
+        .impact-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(0.75rem, 2vw, 2rem);
+        }
+        @media (max-width: 800px) {
+            .impact-cols { grid-template-columns: 1fr; }
+        }
+        .impact-section-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: var(--h3-size);
+            margin-bottom: clamp(0.25rem, 0.5vw, 0.5rem);
+        }
+        .impact-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.2rem, 0.5vw, 0.4rem);
+        }
+        .impact-list li {
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            line-height: 1.5;
+            padding-left: clamp(10px, 1.2vw, 18px);
+            position: relative;
+        }
+        .impact-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: clamp(5px, 0.6vw, 8px);
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+        }
+        .impact-list.velocity li::before { background: var(--fed-color); }
+        .impact-list.flexibility li::before { background: var(--accent-blue); }
+        .impact-list.reliability li::before { background: var(--accent-cyan); }
+
+        .data-type-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(0.4rem, 1vw, 1rem);
+            margin-top: clamp(0.2rem, 0.5vw, 0.5rem);
+        }
+        .type-card {
+            border-radius: 8px;
+            padding: clamp(6px, 0.8vw, 12px);
+            font-size: var(--mono-size);
+            font-family: var(--font-mono);
+        }
+        .type-card-old {
+            background: var(--legacy-dim);
+            border: 1px solid rgba(249, 115, 22, 0.15);
+        }
+        .type-card-new {
+            background: var(--fed-dim);
+            border: 1px solid rgba(6, 214, 160, 0.15);
+        }
+        .type-card .type-label {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: var(--small-size);
+            margin-bottom: 4px;
+        }
+        .type-card-old .type-label { color: var(--legacy-color); }
+        .type-card-new .type-label { color: var(--fed-color); }
+        .type-card code {
+            display: block;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            white-space: pre;
+        }
+
+        /* ===========================================
+           SLIDE 6: OUTCOMES
+           =========================================== */
+        .outcomes-slide {
+            background:
+                radial-gradient(ellipse at 30% 70%, rgba(6, 214, 160, 0.05) 0%, transparent 40%),
+                radial-gradient(ellipse at 70% 30%, rgba(56, 189, 248, 0.04) 0%, transparent 40%),
+                var(--bg-primary);
+        }
+        .outcomes-slide .slide-content {
+            gap: clamp(0.5rem, 1.2vw, 1.2rem);
+        }
+        .outcomes-slide h2 { font-size: var(--h2-size); }
+        .outcomes-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(0.5rem, 1.5vw, 1.5rem);
+        }
+        @media (max-width: 800px) {
+            .outcomes-grid { grid-template-columns: 1fr; }
+        }
+        .outcome-block {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.2rem, 0.5vw, 0.4rem);
+        }
+        .outcome-block-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: var(--h3-size);
+        }
+        .outcome-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.15rem, 0.4vw, 0.3rem);
+        }
+        .outcome-list li {
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            line-height: 1.5;
+            padding-left: clamp(10px, 1.2vw, 18px);
+            position: relative;
+        }
+        .outcome-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: clamp(5px, 0.6vw, 8px);
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--fed-color);
+        }
+        .analogy-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--mono-size);
+        }
+        .analogy-table th {
+            font-family: var(--font-display);
+            font-size: var(--small-size);
+            font-weight: 600;
+            text-align: left;
+            padding: clamp(3px, 0.4vw, 6px) clamp(4px, 0.6vw, 8px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-secondary);
+        }
+        .analogy-table td {
+            padding: clamp(2px, 0.3vw, 4px) clamp(4px, 0.6vw, 8px);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        .analogy-table td:first-child { color: var(--text-primary); }
+        .analogy-table td:last-child { color: var(--accent-cyan); }
+
+        .reflection-box {
+            background: rgba(56, 189, 248, 0.04);
+            border: 1px solid rgba(56, 189, 248, 0.1);
+            border-radius: 8px;
+            padding: clamp(8px, 1vw, 16px);
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-style: italic;
+        }
+
+        /* ===========================================
+           SLIDE 7: FUTURE VISION — AGENTIC DATA LAYER
+           =========================================== */
+        .vision-slide {
+            background:
+                radial-gradient(ellipse at 60% 40%, rgba(168, 85, 247, 0.08) 0%, transparent 45%),
+                radial-gradient(ellipse at 20% 80%, rgba(6, 214, 160, 0.05) 0%, transparent 40%),
+                var(--bg-primary);
+        }
+        .vision-slide .slide-content {
+            gap: clamp(0.5rem, 1.2vw, 1.2rem);
+        }
+        .vision-slide h2 {
+            font-size: var(--h2-size);
+            background: linear-gradient(135deg, #a78bfa 20%, var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .vision-flow svg {
+            width: 100%;
+            max-height: min(36vh, 280px);
+        }
+        .vision-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(0.5rem, 1.5vw, 1.5rem);
+        }
+        @media (max-width: 800px) {
+            .vision-compare { grid-template-columns: 1fr; }
+        }
+        .vision-card {
+            border-radius: 8px;
+            padding: clamp(8px, 1vw, 14px);
+            font-size: var(--small-size);
+            line-height: 1.5;
+        }
+        .vision-card-old {
+            background: rgba(249, 115, 22, 0.04);
+            border: 1px solid rgba(249, 115, 22, 0.12);
+        }
+        .vision-card-new {
+            background: rgba(168, 85, 247, 0.06);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+        }
+        .vision-card .vision-card-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: var(--small-size);
+            margin-bottom: clamp(3px, 0.4vw, 6px);
+        }
+        .vision-card-old .vision-card-title { color: var(--legacy-color); }
+        .vision-card-new .vision-card-title { color: #a78bfa; }
+        .vision-card .vision-card-desc {
+            color: var(--text-secondary);
+            font-size: var(--mono-size);
+        }
+        .vision-card code {
+            font-family: var(--font-mono);
+            font-size: var(--mono-size);
+            color: var(--accent-cyan);
+            background: rgba(34, 211, 238, 0.06);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        .tag-vision {
+            background: rgba(168, 85, 247, 0.12);
+            color: #a78bfa;
+            border: 1px solid rgba(168, 85, 247, 0.25);
+        }
+
+        /* ===========================================
+           INLINE EDITING
+           =========================================== */
+        .edit-hotzone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80px;
+            height: 80px;
+            z-index: 10000;
+            cursor: pointer;
+        }
+        .edit-toggle {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, background 0.2s ease;
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .edit-toggle.show,
+        .edit-toggle.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .edit-toggle.active {
+            background: var(--fed-color);
+            color: var(--bg-primary);
+            border-color: var(--fed-color);
+        }
+        .edit-toggle:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .edit-toggle.active:hover {
+            background: var(--fed-color);
+            filter: brightness(1.15);
+        }
+
+        /* Edit mode indicator bar */
+        .edit-mode-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 36px;
+            background: var(--bg-secondary);
+            border-top: 1px solid rgba(6, 214, 160, 0.2);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(8px, 1vw, 16px);
+            z-index: 10001;
+            font-family: var(--font-mono);
+            font-size: var(--small-size);
+        }
+        .edit-mode-bar.visible { display: flex; }
+        .edit-mode-bar span { color: var(--fed-color); }
+        .edit-mode-bar button {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: var(--mono-size);
+            padding: 3px 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .edit-mode-bar button:hover {
+            background: rgba(255,255,255,0.12);
+            color: var(--text-primary);
+        }
+
+        /* Editable element hover hint */
+        body.edit-mode [contenteditable="true"] {
+            outline: 1px dashed rgba(6, 214, 160, 0.25);
+            outline-offset: 2px;
+            border-radius: 3px;
+            transition: outline-color 0.2s;
+            cursor: text;
+        }
+        body.edit-mode [contenteditable="true"]:hover {
+            outline-color: rgba(6, 214, 160, 0.5);
+        }
+        body.edit-mode [contenteditable="true"]:focus {
+            outline: 1px solid var(--fed-color);
+            outline-offset: 2px;
+            background: rgba(6, 214, 160, 0.03);
+        }
+    </style>
+</head>
+<body>
+    <!-- Edit Mode Controls -->
+    <div class="edit-hotzone" id="editHotzone"></div>
+    <button class="edit-toggle" id="editToggle" title="Edit mode (E)">&#9998;</button>
+    <div class="edit-mode-bar" id="editModeBar">
+        <span>EDIT MODE</span>
+        <button id="editSave" title="Save to localStorage (Ctrl+S)">Save</button>
+        <button id="editExport" title="Export HTML file">Export</button>
+        <button id="editReset" title="Reset to original">Reset</button>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar" id="progressBar"></div>
+
+    <!-- Navigation Dots -->
+    <nav class="nav-dots" id="navDots"></nav>
+
+    <!-- ===========================================
+         SLIDE 1: TITLE + CONTEXT
+         =========================================== -->
+    <section class="slide title-slide grid-bg" data-title="Title">
+        <div class="slide-content">
+            <div class="context-line reveal">TECH DEEP DIVE</div>
+            <h1 class="reveal">Federated Content Targeting Engine</h1>git branch -M main
+            <p class="subtitle reveal">A cross-runtime, decentralized rule evaluation SDK for personalized content delivery</p>
+            <div class="title-rule-badge reveal">1,000+ date points fetched per request &middot; multi-team adoption</div>
+            <div class="rule-expr reveal" style="margin-top: clamp(0.5rem, 1vw, 1rem);">IF(creditScore > 700, income > 50000 AND debt < 10000, FALSE)</div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 2: RULE ENGINE — ADT + BATCHING
+         =========================================== -->
+    <section class="slide rule-slide grid-bg" data-title="Rule Engine">
+        <div class="slide-content">
+            <span class="slide-number">02</span>
+            <h2 class="reveal">How Rules Are Evaluated: Computation as a free Monad program</h2>
+            <div class="rule-expr reveal">IF(creditScore > 700, income > 50000 AND debt < 10000, FALSE)</div>
+
+            <div class="composition-modes reveal">
+                <span class="mode-pill mode-parallel">&#x25B6; join = parallel &mdash; batched into 1 request</span>
+                <span class="mode-pill mode-sequential">&#x25BC; flatMap = sequential &mdash; creates batch boundary</span>
+            </div>
+
+            <div class="ast-diagram reveal">
+                <!-- AST Tree Diagram (SVG) -->
+                <div class="ast-tree">
+                    <svg viewBox="0 0 520 340" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Connections -->
+                        <line x1="260" y1="38" x2="130" y2="90" stroke="#f97316" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>
+                        <line x1="260" y1="38" x2="390" y2="90" stroke="#f97316" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5"/>
+                        <line x1="130" y1="118" x2="70" y2="165" stroke="#06d6a0" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="130" y1="118" x2="190" y2="165" stroke="#06d6a0" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="390" y1="118" x2="320" y2="185" stroke="#06d6a0" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="390" y1="118" x2="460" y2="185" stroke="#06d6a0" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="320" y1="213" x2="270" y2="260" stroke="#06d6a0" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="320" y1="213" x2="370" y2="260" stroke="#06d6a0" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="460" y1="213" x2="420" y2="260" stroke="#06d6a0" stroke-width="1.5" opacity="0.5"/>
+                        <line x1="460" y1="213" x2="500" y2="260" stroke="#06d6a0" stroke-width="1.5" opacity="0.5"/>
+
+                        <!-- Root: Bind (IF) -->
+                        <rect x="195" y="12" width="130" height="28" rx="6" fill="#1e1e3a" stroke="#f97316" stroke-width="1.5"/>
+                        <text x="260" y="31" text-anchor="middle" fill="#f97316" font-family="Space Mono, monospace" font-size="11" font-weight="700">Bind (IF)</text>
+
+                        <!-- Batch 1 label -->
+                        <rect x="2" y="55" width="255" height="135" rx="8" fill="none" stroke="#f97316" stroke-width="1" stroke-dasharray="5,4" opacity="0.25"/>
+                        <text x="12" y="70" fill="#f97316" font-family="Space Mono, monospace" font-size="9" opacity="0.6">BATCH 1</text>
+
+                        <!-- Join (creditScore > 600) -->
+                        <rect x="55" y="90" width="150" height="28" rx="6" fill="#0d2818" stroke="#06d6a0" stroke-width="1.2"/>
+                        <text x="130" y="109" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="10">Join (>)</text>
+
+                        <!-- Fetch creditScore -->
+                        <rect x="10" y="165" width="120" height="24" rx="5" fill="#1a1a2e" stroke="#38bdf8" stroke-width="1.2"/>
+                        <text x="70" y="182" text-anchor="middle" fill="#38bdf8" font-family="Space Mono, monospace" font-size="9">Fetch(creditScore)</text>
+
+                        <!-- Pure 600 -->
+                        <rect x="145" y="165" width="80" height="24" rx="5" fill="#1a1a2e" stroke="#4a5568" stroke-width="1"/>
+                        <text x="185" y="182" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="9">Pure(700)</text>
+
+                        <!-- Batch boundary annotation -->
+                        <text x="270" y="72" fill="#f97316" font-family="DM Sans, sans-serif" font-size="9" font-style="italic" opacity="0.7">flatMap boundary</text>
+                        <line x1="260" y1="40" x2="260" y2="88" stroke="#f97316" stroke-width="1" stroke-dasharray="2,2" opacity="0.3"/>
+
+                        <!-- Batch 2 label -->
+                        <rect x="263" y="145" width="255" height="185" rx="8" fill="none" stroke="#06d6a0" stroke-width="1" stroke-dasharray="5,4" opacity="0.25"/>
+                        <text x="273" y="160" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9" opacity="0.6">BATCH 2 (if predicate = true)</text>
+
+                        <!-- Join (AND) -->
+                        <rect x="330" y="90" width="120" height="28" rx="6" fill="#0d2818" stroke="#06d6a0" stroke-width="1.2"/>
+                        <text x="390" y="109" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="10">Join (AND)</text>
+
+                        <!-- Join income > 10000 -->
+                        <rect x="270" y="185" width="100" height="28" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
+                        <text x="320" y="204" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9">Join (>)</text>
+
+                        <!-- Join debt < 5000 -->
+                        <rect x="410" y="185" width="100" height="28" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
+                        <text x="460" y="204" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9">Join (<)</text>
+
+                        <!-- Fetch income -->
+                        <rect x="218" y="260" width="104" height="24" rx="5" fill="#1a1a2e" stroke="#38bdf8" stroke-width="1.2"/>
+                        <text x="270" y="277" text-anchor="middle" fill="#38bdf8" font-family="Space Mono, monospace" font-size="9">Fetch(income)</text>
+
+                        <!-- Pure 10000 -->
+                        <rect x="335" y="260" width="80" height="24" rx="5" fill="#1a1a2e" stroke="#4a5568" stroke-width="1"/>
+                        <text x="375" y="277" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="9">Pure(50000)</text>
+
+                        <!-- Fetch debt -->
+                        <rect x="370" y="260" width="100" height="24" rx="5" fill="#1a1a2e" stroke="#38bdf8" stroke-width="1.2"/>
+                        <text x="420" y="277" text-anchor="middle" fill="#38bdf8" font-family="Space Mono, monospace" font-size="9">Fetch(debt)</text>
+
+                        <!-- Pure 5000 -->
+                        <rect x="458" y="260" width="60" height="24" rx="5" fill="#1a1a2e" stroke="#4a5568" stroke-width="1"/>
+                        <text x="488" y="277" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="9">Pure(10000)</text>
+
+                        <!-- False branch annotation -->
+                        <text x="287" y="130" fill="#4a5568" font-family="Space Mono, monospace" font-size="8" font-style="italic">if false: Pure(false) -- no fetch</text>
+
+                        <!-- Key insight arrow -->
+                        <text x="220" y="316" fill="#38bdf8" font-family="Space Mono, monospace" font-size="8">Fetch nodes</text>
+                        <text x="220" y="330" fill="#8892a8" font-family="DM Sans, sans-serif" font-size="8">= data dependencies batched by the interpreter</text>
+                    </svg>
+                </div>
+
+                <!-- Batch flow explanation -->
+                <div class="batch-flow">
+                    <div class="batch-card batch-card-legacy">
+                        <div class="label">Without Same-Origin: 2 RPCs</div>
+                        <div class="desc">Batch 1: {creditScore}<br/>Predicate resolves: 750 > 700 = true<br/>Batch 2: {income, debt}<br/>AND: 85000 > 50000, 3000 < 10000</div>
+                    </div>
+                    <div class="batch-card batch-card-fed">
+                        <div class="label">With Same-Origin: 1 RPC</div>
+                        <div class="desc">Batch 1: request {creditScore}<br/>Optimizer expands to {creditScore,<br/>&nbsp;income, debt} (same origin service)<br/>Batch 2: cache hit -- no RPC needed</div>
+                    </div>
+                    <div class="batch-card" style="background: rgba(56, 189, 248, 0.06); border-left: 3px solid var(--accent-blue);">
+                        <div class="label" style="color: var(--accent-blue);">Key Insight</div>
+                        <div class="desc">The tree is data, not execution.<br/>The interpreter decides when to<br/>batch and fetch. Same-origin<br/>pre-fetches siblings speculatively.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 3: CENTRALIZED ARCHITECTURE PROBLEM
+         =========================================== -->
+    <section class="slide problem-slide grid-bg" data-title="The Problem">
+        <div class="slide-content">
+            <span class="slide-number">03</span>
+            <h2 class="reveal">Why This Became a Liability</h2>
+            <span class="tag tag-legacy reveal">CENTRALIZED ARCHITECTURE</span>
+
+            <!-- Architecture Diagram -->
+            <div class="arch-diagram reveal">
+                <svg viewBox="0 0 780 180" xmlns="http://www.w3.org/2000/svg">
+                    <!-- User Request -->
+                    <rect x="0" y="65" width="100" height="40" rx="6" fill="#1a1a2e" stroke="#8892a8" stroke-width="1"/>
+                    <text x="50" y="89" text-anchor="middle" fill="#e8eaf0" font-family="DM Sans, sans-serif" font-size="11">User Request</text>
+
+                    <!-- Arrow -->
+                    <line x1="105" y1="85" x2="155" y2="85" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+
+                    <!-- Centralized Targeting Service -->
+                    <rect x="160" y="50" width="170" height="60" rx="8" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="1.5"/>
+                    <text x="245" y="75" text-anchor="middle" fill="#f97316" font-family="Syne, sans-serif" font-size="11" font-weight="700">Centralized Targeting</text>
+                    <text x="245" y="92" text-anchor="middle" fill="#f97316" font-family="Syne, sans-serif" font-size="10">Service</text>
+                    <text x="245" y="105" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="7">Free Monad + Origin Map</text>
+
+                    <!-- Arrow -->
+                    <line x1="335" y1="85" x2="385" y2="85" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
+
+                    <!-- Centralized Data Registry -->
+                    <rect x="390" y="55" width="140" height="50" rx="8" fill="rgba(249,115,22,0.05)" stroke="#f97316" stroke-width="1" stroke-dasharray="4,3"/>
+                    <text x="460" y="77" text-anchor="middle" fill="#f97316" font-family="DM Sans, sans-serif" font-size="10" font-weight="500">Centralized Data</text>
+                    <text x="460" y="92" text-anchor="middle" fill="#f97316" font-family="DM Sans, sans-serif" font-size="10" font-weight="500">Registry + Retriever</text>
+
+                    <!-- Fan-out arrows -->
+                    <line x1="535" y1="70" x2="600" y2="25" stroke="#8892a8" stroke-width="1" marker-end="url(#arrowGray)"/>
+                    <line x1="535" y1="75" x2="600" y2="60" stroke="#8892a8" stroke-width="1" marker-end="url(#arrowGray)"/>
+                    <line x1="535" y1="85" x2="600" y2="100" stroke="#8892a8" stroke-width="1" marker-end="url(#arrowGray)"/>
+                    <line x1="535" y1="90" x2="600" y2="140" stroke="#8892a8" stroke-width="1" marker-end="url(#arrowGray)"/>
+
+                    <!-- Domain Services -->
+                    <rect x="605" y="10" width="120" height="28" rx="5" fill="#1a1a2e" stroke="#4a5568" stroke-width="1"/>
+                    <text x="665" y="29" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="9">Credit Service</text>
+                    <rect x="605" y="47" width="120" height="28" rx="5" fill="#1a1a2e" stroke="#4a5568" stroke-width="1"/>
+                    <text x="665" y="66" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="9">Account Service</text>
+                    <rect x="605" y="84" width="120" height="28" rx="5" fill="#1a1a2e" stroke="#4a5568" stroke-width="1"/>
+                    <text x="665" y="103" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="9">ML Features</text>
+                    <rect x="605" y="121" width="120" height="28" rx="5" fill="#1a1a2e" stroke="#4a5568" stroke-width="1"/>
+                    <text x="665" y="140" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="9">Behavior Signals</text>
+
+                    <!-- Single point of failure annotation -->
+                    <text x="245" y="135" text-anchor="middle" fill="#ef4444" font-family="Space Mono, monospace" font-size="8" font-style="italic">single point of failure</text>
+                    <text x="460" y="135" text-anchor="middle" fill="#ef4444" font-family="Space Mono, monospace" font-size="8" font-style="italic">single point of failure</text>
+
+                    <!-- Arrow markers -->
+                    <defs>
+                        <marker id="arrowOrange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+                            <polygon points="0 0, 8 3, 0 6" fill="#f97316"/>
+                        </marker>
+                        <marker id="arrowGray" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+                            <polygon points="0 0, 6 2, 0 4" fill="#8892a8"/>
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+
+            <!-- Problem Cards -->
+            <div class="problems-grid reveal">
+                <div class="problem-card">
+                    <div class="problem-title">Architectural Fragility</div>
+                    <div class="problem-desc">Any outage cascades to ALL content targeting across every product surface</div>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-title">Maintainability Barrier</div>
+                    <div class="problem-desc">Free monad program composed with cats and Finagle futures, interpreted by a lazy batch runner. Requires end-to-end understanding of the evaluation pipeline to maintain safely -- most engineers on the team could not confidently modify this code.</div>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-title">Security Blast Radius</div>
+                    <div class="problem-desc">One service with read-access to ALL domain data -- credit, account, behavior, ML features</div>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-title">Cross-team Coupling</div>
+                    <div class="problem-desc">Every data point definition needs to onboard to the central registry, adding friction for all product teams.</div>
+                </div>
+                <div class="problem-card">
+                    <div class="problem-title">Rigid Data Types</div>
+                    <div class="problem-desc">Fixed types: Number, String, Boolean, Date. No complex structures. Adding a type = ADT + evaluator + serialization changes.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 4: FEDERATED SOLUTION
+         =========================================== -->
+    <section class="slide solution-slide grid-bg" data-title="The Solution">
+        <div class="slide-content">
+            <span class="slide-number">04</span>
+            <h2 class="reveal">The Solution: Federation via Cross-Runtime Bridge</h2>
+            <span class="tag tag-fed reveal">FEDERATED ARCHITECTURE</span>
+
+            <!-- Federated Architecture Diagram -->
+            <div class="fed-arch reveal">
+                <svg viewBox="0 0 780 185" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Product Team Service Container -->
+                    <rect x="10" y="5" width="530" height="175" rx="10" fill="rgba(6,214,160,0.03)" stroke="#06d6a0" stroke-width="1.5"/>
+                    <text x="30" y="25" fill="#06d6a0" font-family="Syne, sans-serif" font-size="11" font-weight="700">Product Team's Service (Node.js)</text>
+
+                    <!-- SDK Layer -->
+                    <rect x="30" y="38" width="200" height="130" rx="8" fill="rgba(6,214,160,0.06)" stroke="#06d6a0" stroke-width="1" stroke-dasharray="4,3"/>
+                    <text x="130" y="57" text-anchor="middle" fill="#06d6a0" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">Federated Data Retrieval SDK</text>
+                    <text x="130" y="72" text-anchor="middle" fill="#06d6a0" font-family="DM Sans, sans-serif" font-size="9">(TypeScript)</text>
+                    <text x="45" y="80" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Local target rules</text>
+                    <text x="45" y="95" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Team-defined data points</text>
+                    <text x="45" y="110" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Request-scoped data cache</text>
+                    <text x="45" y="125" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Type-safe contracts</text>
+                    <text x="45" y="140" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Pluggable transformers</text>
+
+                    <!-- Rust Bridge -->
+                    <rect x="260" y="50" width="130" height="55" rx="8" fill="rgba(56,189,248,0.06)" stroke="#38bdf8" stroke-width="1"/>
+                    <text x="325" y="72" text-anchor="middle" fill="#38bdf8" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">Rust Bridge</text>
+                    <text x="325" y="87" text-anchor="middle" fill="#38bdf8" font-family="DM Sans, sans-serif" font-size="9">(JNI / Napi)</text>
+                    <text x="325" y="100" text-anchor="middle" fill="#4a5568" font-family="Space Mono, monospace" font-size="7">memory-safe & high throughput</text>
+
+                    <!-- JVM Rule Engine -->
+                    <rect x="260" y="120" width="130" height="45" rx="8" fill="rgba(139,92,246,0.06)" stroke="#a78bfa" stroke-width="1"/>
+                    <text x="325" y="140" text-anchor="middle" fill="#a78bfa" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">JVM Rule Engine</text>
+                    <text x="325" y="155" text-anchor="middle" fill="#a78bfa" font-family="DM Sans, sans-serif" font-size="9">(Scala, unchanged)</text>
+
+                    <!-- Arrows between layers -->
+                    <line x1="232" y1="80" x2="256" y2="77" stroke="#8892a8" stroke-width="1" marker-end="url(#arrowGray2)"/>
+                    <line x1="256" y1="77" x2="232" y2="74" stroke="#8892a8" stroke-width="1" marker-end="url(#arrowGray2)"/>
+                    <line x1="325" y1="107" x2="325" y2="118" stroke="#8892a8" stroke-width="1" marker-end="url(#arrowGray2)"/>
+
+                    <!-- Arrow to domain services -->
+                    <line x1="130" y1="170" x2="130" y2="175" stroke="#06d6a0" stroke-width="1"/>
+
+                    <!-- Right side: team's own data sources -->
+                    <line x1="543" y1="50" x2="590" y2="30" stroke="#06d6a0" stroke-width="1" marker-end="url(#arrowTeal)"/>
+                    <line x1="543" y1="90" x2="590" y2="90" stroke="#06d6a0" stroke-width="1" marker-end="url(#arrowTeal)"/>
+                    <line x1="543" y1="130" x2="590" y2="150" stroke="#06d6a0" stroke-width="1" marker-end="url(#arrowTeal)"/>
+
+                    <!-- Team's own services only -->
+                    <rect x="595" y="15" width="160" height="30" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
+                    <text x="675" y="35" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9">Team's Domain Service</text>
+                    <rect x="595" y="75" width="160" height="30" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
+                    <text x="675" y="95" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9">Team's ML Features</text>
+                    <rect x="595" y="135" width="160" height="30" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
+                    <text x="675" y="155" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9">OtherSources</text>
+
+                    <!-- Annotation -->
+                    <text x="625" y="10" fill="#4a5568" font-family="Space Mono, monospace" font-size="7" font-style="italic">only team's own data</text>
+
+                    <defs>
+                        <marker id="arrowTeal" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+                            <polygon points="0 0, 7 2.5, 0 5" fill="#06d6a0"/>
+                        </marker>
+                        <marker id="arrowGray2" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+                            <polygon points="0 0, 6 2, 0 4" fill="#8892a8"/>
+                        </marker>
+                        <marker id="arrowGray2r" markerWidth="6" markerHeight="4" refX="0" refY="2" orient="auto">
+                            <polygon points="6 0, 0 2, 6 4" fill="#8892a8"/>
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="reveal" style="overflow-x: auto;">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Dimension</th>
+                            <th>Centralized (Before)</th>
+                            <th>Federated (After)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Data Types</td>
+                            <td>Fixed: Number, String, Boolean, Date</td>
+                            <td>Any TypeScript type, team-defined</td>
+                        </tr>
+                        <tr>
+                            <td>Adding Data</td>
+                            <td>Rule + registry + transformer</td>
+                            <td>Define with SDK, deploy your service</td>
+                        </tr>
+                        <tr>
+                            <td>Failure Blast</td>
+                            <td>Total -- all targeting down</td>
+                            <td>Isolated to one product team</td>
+                        </tr>
+                        <tr>
+                            <td>Data Access</td>
+                            <td>Central service reads ALL domain data</td>
+                            <td>Each service reads only its own</td>
+                        </tr>
+                        <tr>
+                            <td>Batching</td>
+                            <td>Optimal but complex (Free Monad)</td>
+                            <td>Simple cache (DataLoader pattern)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 5: CUSTOMER IMPACT
+         =========================================== -->
+    <!--section class="slide impact-slide grid-bg" data-title="Impact">
+        <div class="slide-content">
+            <span class="slide-number">05</span>
+            <h2 class="reveal">Impact: Developer Velocity and Data Flexibility</h2>
+
+            <div class="impact-cols reveal">
+                
+                <div>
+                    <div class="impact-section-title" style="color: var(--fed-color);">Velocity</div>
+                    <ul class="impact-list velocity">
+                        <li>Teams ship targeting changes independently -- no central deployment needed</li>
+                        <li>New SDK adopters tracked via time-to-first-evaluation metric</li>
+                        <li>Product teams experiment with content strategies without platform bottleneck</li>
+                    </ul>
+                    <div class="impact-section-title" style="color: var(--accent-cyan); margin-top: clamp(0.5rem, 1vw, 1rem);">Reliability</div>
+                    <ul class="impact-list reliability">
+                        <li>Eliminated centralized single point of failure</li>
+                        <li>P50/P99 latency reduction -- no network hop to central service</li>
+                        <li>Graceful degraded mode during upstream incidents</li>
+                    </ul>
+                </div>
+
+                
+                <div>
+                    <div class="impact-section-title" style="color: var(--accent-blue);">Data Flexibility</div>
+                    <div class="data-type-compare">
+                        <div class="type-card type-card-old">
+                            <div class="type-label">Before: Rigid Types</div>
+                            <code>Number
+String
+Boolean
+Date | DateTime
+---
+TableFact: unsupported
+Nested:    impossible</code>
+                        </div>
+                        <div class="type-card type-card-new">
+                            <div class="type-label">After: Flexible + Type-safe</div>
+                            <code>interface CreditProfile {
+  score: number
+  utilization: number
+  accounts: Account[]
+  history: CreditEvent[]
+}
+// any shape, compile-time safe</code>
+                        </div>
+                    </div>
+                    <div style="margin-top: clamp(0.4rem, 0.8vw, 0.8rem);">
+                        <div class="impact-section-title" style="color: var(--text-secondary); font-size: var(--small-size);">Telemetry</div>
+                        <ul class="impact-list flexibility" style="opacity: 0.7;">
+                            <li>Measured: latency per surface, cache hit rate, availability</li>
+                            <li>Would add: rule-level latency, per-source fetch latency, adoption funnels</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section-->
+
+    <!-- ===========================================
+         SLIDE 6: OUTCOMES & REFLECTIONS
+         =========================================== -->
+    <section class="slide outcomes-slide grid-bg" data-title="Outcomes">
+        <div class="slide-content">
+            <span class="slide-number">05</span>
+            <h2 class="reveal">Outcomes and What I Learned</h2>
+
+            <div class="outcomes-grid reveal">
+                <!-- What Shipped -->
+                <div class="outcome-block">
+                    <div class="outcome-block-title" style="color: var(--fed-color);">What Shipped</div>
+                    <ul class="outcome-list">
+                        <li>Federated Targeting SDK adopted by multiple product teams</li>
+                        <li>First cross-runtime capability in production</li>
+                        <li>Measurable latency and resilience improvements</li>
+                        <li>Centralized service progressively deprecated</li>
+                    </ul>
+                    <!--div style="margin-top: clamp(0.3rem, 0.6vw, 0.5rem);">
+                        <div class="outcome-block-title" style="color: var(--accent-blue); font-size: var(--small-size);">Cross-Runtime Debugging</div>
+                        <ul class="outcome-list">
+                            <li>Post-launch memory leak: OTel instruments created per-call across JNI boundary instead of singleton</li>
+                            <li>JVM GC does not manage off-heap/native memory -- required cross-runtime profiling (jemalloc)</li>
+                        </ul>
+                    </div-->
+                </div>
+
+                <!-- Analogies + Reflections -->
+                <!--div class="outcome-block">
+                    <div class="outcome-block-title" style="color: var(--text-secondary);">Technology Analogies</div>
+                    <table class="analogy-table">
+                        <thead>
+                            <tr><th>This Project</th><th>Similar To</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Centralized fan-out</td><td>Apollo Federation</td></tr>
+                            <tr><td>DSL rule engine</td><td>JSON Logic / SpEL</td></tr>
+                            <tr><td>Rust JNI bridge</td><td>Node.js N-API addon</td></tr>
+                            <tr><td>Federated Data SDK</td><td>LaunchDarkly SDK</td></tr>
+                            <tr><td>Request cache</td><td>GraphQL DataLoader</td></tr>
+                        </tbody>
+                    </table>
+                </div-->
+            </div>
+
+            <div class="reflection-box reveal">
+                "The Free Monad engine was elegant but became a maintenance liability. The right architecture is not the most optimal or elegant one -- it is the one your team can safely maintain and extend. Federation gave teams genuine autonomy and unlocked features they could not do before."
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 7: FUTURE VISION — AGENTIC DATA LAYER
+         =========================================== -->
+    <section class="slide vision-slide grid-bg" data-title="Future Vision">
+        <div class="slide-content">
+            <span class="slide-number">06</span>
+            <h2 class="reveal">Future: Agentic Data Layer</h2>
+            <span class="tag tag-vision reveal">WHAT THIS UNLOCKS</span>
+
+            <!-- Architecture Diagram -->
+            <div class="vision-flow reveal">
+                <svg viewBox="0 0 820 230" xmlns="http://www.w3.org/2000/svg">
+                    <!-- LLM Agent -->
+                    <rect x="10" y="70" width="140" height="75" rx="10" fill="rgba(168,85,247,0.08)" stroke="#a78bfa" stroke-width="1.5"/>
+                    <text x="80" y="95" text-anchor="middle" fill="#a78bfa" font-family="Syne, sans-serif" font-size="11" font-weight="700">LLM Agent</text>
+                    <text x="80" y="112" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">"What is this user's</text>
+                    <text x="80" y="124" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">financial health?"</text>
+                    <text x="80" y="140" text-anchor="middle" fill="#4a5568" font-family="Space Mono, monospace" font-size="7" font-style="italic">natural language intent</text>
+
+                    <!-- Arrow: LLM -> Schema -->
+                    <line x1="155" y1="95" x2="195" y2="95" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowPurple)"/>
+                    <text x="175" y="88" text-anchor="middle" fill="#a78bfa" font-family="Space Mono, monospace" font-size="7">reads</text>
+
+                    <!-- GraphQL Schema -->
+                    <rect x="200" y="25" width="170" height="100" rx="8" fill="rgba(168,85,247,0.05)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="4,3"/>
+                    <text x="285" y="45" text-anchor="middle" fill="#a78bfa" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">GraphQL Schema</text>
+                    <text x="285" y="58" text-anchor="middle" fill="#4a5568" font-family="Space Mono, monospace" font-size="7" font-style="italic">describes available data</text>
+                    <text x="215" y="76" fill="#22d3ee" font-family="Space Mono, monospace" font-size="8">type User {</text>
+                    <text x="215" y="89" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">  creditScore: Int</text>
+                    <text x="215" y="102" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">  accounts: [Account]</text>
+                    <text x="215" y="115" fill="#22d3ee" font-family="Space Mono, monospace" font-size="8">}</text>
+
+                    <!-- Arrow: LLM -> GQL Query -->
+                    <line x1="155" y1="120" x2="195" y2="160" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowPurple)"/>
+                    <text x="160" y="148" fill="#a78bfa" font-family="Space Mono, monospace" font-size="7">generates</text>
+
+                    <!-- GQL Query -->
+                    <rect x="200" y="138" width="170" height="82" rx="8" fill="rgba(34,211,238,0.05)" stroke="#22d3ee" stroke-width="1"/>
+                    <text x="285" y="156" text-anchor="middle" fill="#22d3ee" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">GraphQL Query</text>
+                    <text x="215" y="174" fill="#22d3ee" font-family="Space Mono, monospace" font-size="8">{ user(id: $id) {</text>
+                    <text x="215" y="187" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">    creditScore</text>
+                    <text x="215" y="200" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">    accounts { balance }</text>
+                    <text x="215" y="213" fill="#22d3ee" font-family="Space Mono, monospace" font-size="8">}}</text>
+
+                    <!-- Arrow: Query -> SDK -->
+                    <line x1="375" y1="178" x2="425" y2="115" stroke="#06d6a0" stroke-width="1.5" marker-end="url(#arrowTeal2)"/>
+                    <text x="410" y="138" fill="#06d6a0" font-family="Space Mono, monospace" font-size="7">executes</text>
+
+                    <!-- Federated Data SDK -->
+                    <rect x="430" y="55" width="170" height="110" rx="10" fill="rgba(6,214,160,0.05)" stroke="#06d6a0" stroke-width="1.5"/>
+                    <text x="515" y="77" text-anchor="middle" fill="#06d6a0" font-family="Syne, sans-serif" font-size="11" font-weight="700">Federated Data SDK</text>
+                    <text x="515" y="95" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">GQL query -> resolvers</text>
+                    <text x="515" y="110" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">-> registered fetchers</text>
+                    <text x="515" y="125" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">-> request-scoped cache</text>
+                    <text x="515" y="142" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="7">type-safe, cached, batched</text>
+                    <text x="515" y="158" text-anchor="middle" fill="#4a5568" font-family="Space Mono, monospace" font-size="7" font-style="italic">existing infrastructure</text>
+
+                    <!-- Arrows: SDK -> Domain Services -->
+                    <line x1="605" y1="85" x2="660" y2="50" stroke="#06d6a0" stroke-width="1" marker-end="url(#arrowTeal2)"/>
+                    <line x1="605" y1="110" x2="660" y2="110" stroke="#06d6a0" stroke-width="1" marker-end="url(#arrowTeal2)"/>
+                    <line x1="605" y1="135" x2="660" y2="170" stroke="#06d6a0" stroke-width="1" marker-end="url(#arrowTeal2)"/>
+
+                    <!-- Domain Services -->
+                    <rect x="665" y="35" width="140" height="28" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
+                    <text x="735" y="54" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="8">Credit Service</text>
+                    <rect x="665" y="96" width="140" height="28" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
+                    <text x="735" y="115" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="8">Account Service</text>
+                    <rect x="665" y="157" width="140" height="28" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
+                    <text x="735" y="176" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="8">ML Feature Store</text>
+
+                    <defs>
+                        <marker id="arrowPurple" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+                            <polygon points="0 0, 7 2.5, 0 5" fill="#a78bfa"/>
+                        </marker>
+                        <marker id="arrowTeal2" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+                            <polygon points="0 0, 7 2.5, 0 5" fill="#06d6a0"/>
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+
+            <!-- Comparison: Traditional RAG vs Agentic Data Layer -->
+            <div class="vision-compare reveal">
+                <div class="vision-card vision-card-old">
+                    <div class="vision-card-title">Traditional Approach: Tool-per-Service RAG</div>
+                    <div class="vision-card-desc">
+                        Each domain service requires a hand-built tool definition. The LLM picks which tool to call, but cannot compose across services in a single query. Adding a new data source means writing a new tool, prompt-engineering the selection logic, and testing tool interactions. Scales linearly with the number of services.
+                    </div>
+                </div>
+                <div class="vision-card vision-card-new">
+                    <div class="vision-card-title">Agentic Data Layer: Schema-Driven Queries</div>
+                    <div class="vision-card-desc">
+                        Domain services and data points are described as a <code>GraphQL schema</code>. The LLM reads the schema and generates a real GQL query expressing exactly what it needs -- across any combination of services, in one request. The SDK resolves each field via its registered fetcher, with caching and batching built in. Adding a data source = extending the schema. No new tools, no prompt changes.
+                    </div>
+                </div>
+            </div>
+
+            <div class="reflection-box reveal" style="border-color: rgba(168, 85, 247, 0.15); background: rgba(168, 85, 247, 0.03);">
+                The Federated Data SDK already maps typed fields to registered fetchers with request-scoped caching. GraphQL is the natural interface: the schema becomes the LLM's "tool documentation," and the query becomes its structured output -- composable, type-safe, and executable without building bespoke tools for every data source.
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+       SLIDE PRESENTATION CONTROLLER
+       =========================================== -->
+    <script>
+        class SlidePresentation {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.isScrolling = false;
+                this.setupIntersectionObserver();
+                this.setupKeyboardNav();
+                this.setupTouchNav();
+                this.setupWheelNav();
+                this.setupProgressBar();
+                this.setupNavDots();
+            }
+
+            /* Intersection Observer: triggers .visible class */
+            setupIntersectionObserver() {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            const idx = Array.from(this.slides).indexOf(entry.target);
+                            if (idx !== -1) {
+                                this.currentSlide = idx;
+                                this.updateNavDots();
+                                this.updateProgressBar();
+                            }
+                        }
+                    });
+                }, { threshold: 0.5 });
+                this.slides.forEach(slide => observer.observe(slide));
+            }
+
+            /* Keyboard: arrows, space, page up/down (disabled when editing text) */
+            setupKeyboardNav() {
+                document.addEventListener('keydown', (e) => {
+                    // Skip navigation when user is editing text
+                    if (e.target.getAttribute('contenteditable') === 'true') return;
+                    switch(e.key) {
+                        case 'ArrowDown':
+                        case 'ArrowRight':
+                        case ' ':
+                        case 'PageDown':
+                            e.preventDefault();
+                            this.goToSlide(this.currentSlide + 1);
+                            break;
+                        case 'ArrowUp':
+                        case 'ArrowLeft':
+                        case 'PageUp':
+                            e.preventDefault();
+                            this.goToSlide(this.currentSlide - 1);
+                            break;
+                        case 'Home':
+                            e.preventDefault();
+                            this.goToSlide(0);
+                            break;
+                        case 'End':
+                            e.preventDefault();
+                            this.goToSlide(this.slides.length - 1);
+                            break;
+                    }
+                });
+            }
+
+            /* Touch / swipe */
+            setupTouchNav() {
+                let startY = 0;
+                document.addEventListener('touchstart', (e) => {
+                    startY = e.touches[0].clientY;
+                }, { passive: true });
+                document.addEventListener('touchend', (e) => {
+                    const diff = startY - e.changedTouches[0].clientY;
+                    if (Math.abs(diff) > 50) {
+                        this.goToSlide(this.currentSlide + (diff > 0 ? 1 : -1));
+                    }
+                }, { passive: true });
+            }
+
+            /* Mouse wheel with debounce */
+            setupWheelNav() {
+                document.addEventListener('wheel', (e) => {
+                    if (this.isScrolling) return;
+                    this.isScrolling = true;
+                    if (e.deltaY > 30) this.goToSlide(this.currentSlide + 1);
+                    else if (e.deltaY < -30) this.goToSlide(this.currentSlide - 1);
+                    setTimeout(() => this.isScrolling = false, 800);
+                }, { passive: true });
+            }
+
+            /* Progress bar */
+            setupProgressBar() {
+                this.progressBar = document.getElementById('progressBar');
+                this.updateProgressBar();
+            }
+
+            updateProgressBar() {
+                if (!this.progressBar) return;
+                const pct = ((this.currentSlide + 1) / this.slides.length) * 100;
+                this.progressBar.style.width = pct + '%';
+            }
+
+            /* Navigation dots */
+            setupNavDots() {
+                const nav = document.getElementById('navDots');
+                if (!nav) return;
+                this.slides.forEach((_, i) => {
+                    const dot = document.createElement('button');
+                    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+                    dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+                    dot.addEventListener('click', () => this.goToSlide(i));
+                    nav.appendChild(dot);
+                });
+                this.dots = nav.querySelectorAll('.nav-dot');
+            }
+
+            updateNavDots() {
+                if (!this.dots) return;
+                this.dots.forEach((dot, i) => {
+                    dot.classList.toggle('active', i === this.currentSlide);
+                });
+            }
+
+            /* Navigate to slide */
+            goToSlide(index) {
+                if (index < 0 || index >= this.slides.length) return;
+                this.currentSlide = index;
+                this.slides[index].scrollIntoView({ behavior: 'smooth' });
+                this.updateNavDots();
+                this.updateProgressBar();
+            }
+        }
+
+        new SlidePresentation();
+
+        /* ===========================================
+           INLINE EDITOR
+           Hover top-left corner or press E to toggle.
+           Click any text to edit. Ctrl+S to save.
+           =========================================== */
+        class InlineEditor {
+            constructor() {
+                this.isActive = false;
+                this.storageKey = 'federated-slides-edits';
+                this.editableSelector = 'h1, h2, h3, p, span, div, li, td, th, code';
+                // Elements that should NOT be editable
+                this.excludeSelector = '.nav-dots, .nav-dot, .edit-toggle, .edit-mode-bar, .edit-mode-bar *, .progress-bar, .edit-hotzone';
+
+                this.toggle = document.getElementById('editToggle');
+                this.bar = document.getElementById('editModeBar');
+                this.hotzone = document.getElementById('editHotzone');
+
+                this.setupHotzone();
+                this.setupKeyboard();
+                this.setupButtons();
+                this.restoreEdits();
+            }
+
+            /* Hotzone: hover top-left to reveal edit button */
+            setupHotzone() {
+                let hideTimeout = null;
+
+                this.hotzone.addEventListener('mouseenter', () => {
+                    clearTimeout(hideTimeout);
+                    this.toggle.classList.add('show');
+                });
+                this.hotzone.addEventListener('mouseleave', () => {
+                    hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.toggle.classList.remove('show');
+                    }, 400);
+                });
+                this.toggle.addEventListener('mouseenter', () => {
+                    clearTimeout(hideTimeout);
+                });
+                this.toggle.addEventListener('mouseleave', () => {
+                    hideTimeout = setTimeout(() => {
+                        if (!this.isActive) this.toggle.classList.remove('show');
+                    }, 400);
+                });
+                this.hotzone.addEventListener('click', () => this.toggleEditMode());
+                this.toggle.addEventListener('click', () => this.toggleEditMode());
+            }
+
+            /* Keyboard: E to toggle, Ctrl+S to save */
+            setupKeyboard() {
+                document.addEventListener('keydown', (e) => {
+                    // E key toggles edit mode (skip if typing in editable)
+                    if ((e.key === 'e' || e.key === 'E') && !e.ctrlKey && !e.metaKey
+                        && !e.target.getAttribute('contenteditable')) {
+                        this.toggleEditMode();
+                    }
+                    // Ctrl+S / Cmd+S saves
+                    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                        e.preventDefault();
+                        if (this.isActive) this.save();
+                    }
+                });
+            }
+
+            /* Bar buttons */
+            setupButtons() {
+                document.getElementById('editSave').addEventListener('click', () => this.save());
+                document.getElementById('editExport').addEventListener('click', () => this.exportFile());
+                document.getElementById('editReset').addEventListener('click', () => this.reset());
+            }
+
+            /* Toggle edit mode on/off */
+            toggleEditMode() {
+                this.isActive = !this.isActive;
+                document.body.classList.toggle('edit-mode', this.isActive);
+                this.toggle.classList.toggle('active', this.isActive);
+                this.bar.classList.toggle('visible', this.isActive);
+
+                if (this.isActive) {
+                    this.toggle.classList.add('show');
+                    this.enableEditing();
+                } else {
+                    this.disableEditing();
+                    this.save();
+                }
+            }
+
+            /* Make text elements editable */
+            enableEditing() {
+                const elements = this.getEditableElements();
+                elements.forEach(el => {
+                    el.setAttribute('contenteditable', 'true');
+                    el.setAttribute('spellcheck', 'false');
+                });
+            }
+
+            /* Remove contenteditable */
+            disableEditing() {
+                document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+                    el.removeAttribute('contenteditable');
+                    el.removeAttribute('spellcheck');
+                });
+            }
+
+            /* Get all editable text elements (excluding controls, SVGs) */
+            getEditableElements() {
+                const all = document.querySelectorAll(this.editableSelector);
+                const excluded = new Set();
+                document.querySelectorAll(this.excludeSelector).forEach(el => {
+                    excluded.add(el);
+                    el.querySelectorAll('*').forEach(child => excluded.add(child));
+                });
+                // Also exclude anything inside SVG
+                document.querySelectorAll('svg, svg *').forEach(el => excluded.add(el));
+
+                return Array.from(all).filter(el => {
+                    if (excluded.has(el)) return false;
+                    if (el.closest('svg')) return false;
+                    if (el.closest('.edit-mode-bar')) return false;
+                    if (el.closest('.nav-dots')) return false;
+                    // Only elements with direct text content
+                    const hasText = Array.from(el.childNodes).some(
+                        n => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0
+                    );
+                    return hasText;
+                });
+            }
+
+            /* Save edits to localStorage using data-edit-id */
+            save() {
+                const edits = {};
+                this.getEditableElements().forEach((el, i) => {
+                    // Assign a stable ID based on position if not present
+                    if (!el.dataset.editId) {
+                        el.dataset.editId = this.computeEditId(el, i);
+                    }
+                    edits[el.dataset.editId] = el.innerHTML;
+                });
+                localStorage.setItem(this.storageKey, JSON.stringify(edits));
+            }
+
+            /* Compute a stable edit ID from element path */
+            computeEditId(el, fallbackIdx) {
+                const slide = el.closest('.slide');
+                const slideIdx = slide ? Array.from(document.querySelectorAll('.slide')).indexOf(slide) : 0;
+                const tag = el.tagName.toLowerCase();
+                const cls = el.className ? '.' + el.className.split(' ')[0] : '';
+                return `s${slideIdx}-${tag}${cls}-${fallbackIdx}`;
+            }
+
+            /* Restore edits from localStorage */
+            restoreEdits() {
+                const stored = localStorage.getItem(this.storageKey);
+                if (!stored) return;
+                try {
+                    const edits = JSON.parse(stored);
+                    const elements = this.getEditableElements();
+                    elements.forEach((el, i) => {
+                        if (!el.dataset.editId) {
+                            el.dataset.editId = this.computeEditId(el, i);
+                        }
+                        if (edits[el.dataset.editId] !== undefined) {
+                            el.innerHTML = edits[el.dataset.editId];
+                        }
+                    });
+                } catch (e) {
+                    // silently ignore corrupt data
+                }
+            }
+
+            /* Export the current HTML as a file download */
+            exportFile() {
+                // Temporarily disable editing to get clean HTML
+                const wasActive = this.isActive;
+                if (wasActive) this.disableEditing();
+
+                // Remove data-edit-id attributes for clean export
+                document.querySelectorAll('[data-edit-id]').forEach(el => {
+                    el.removeAttribute('data-edit-id');
+                });
+
+                const html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'federated-targeting-engine-edited.html';
+                a.click();
+                URL.revokeObjectURL(url);
+
+                if (wasActive) this.enableEditing();
+            }
+
+            /* Reset all edits */
+            reset() {
+                if (!confirm('Reset all text edits to original? This cannot be undone.')) return;
+                localStorage.removeItem(this.storageKey);
+                location.reload();
+            }
+        }
+
+        const editor = new InlineEditor();
+    </script>
+</body>
+</html>
