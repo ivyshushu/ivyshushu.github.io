@@ -906,7 +906,7 @@
     <section class="slide title-slide grid-bg" data-title="Title">
         <div class="slide-content">
             <div class="context-line reveal">TECH DEEP DIVE</div>
-            <h1 class="reveal">Federated Content Targeting Engine</h1>git branch -M main
+            <h1 class="reveal">Federated Content Targeting Engine</h1>
             <p class="subtitle reveal">A cross-runtime, decentralized rule evaluation SDK for personalized content delivery</p>
             <div class="title-rule-badge reveal">1,000+ date points fetched per request &middot; multi-team adoption</div>
             <div class="rule-expr reveal" style="margin-top: clamp(0.5rem, 1vw, 1rem);">IF(creditScore > 700, income > 50000 AND debt < 10000, FALSE)</div>
@@ -1020,7 +1020,7 @@
                     </div>
                     <div class="batch-card" style="background: rgba(56, 189, 248, 0.06); border-left: 3px solid var(--accent-blue);">
                         <div class="label" style="color: var(--accent-blue);">Key Insight</div>
-                        <div class="desc">The tree is data, not execution.<br/>The interpreter decides when to<br/>batch and fetch. Same-origin<br/>pre-fetches siblings speculatively.</div>
+                        <div class="desc">The tree is just a data structure, not execution.<br/>The interpreter decides when to<br/>batch and fetch. Same-origin<br/>pre-fetches siblings speculatively.</div>
                     </div>
                 </div>
             </div>
@@ -1050,7 +1050,7 @@
                     <rect x="160" y="50" width="170" height="60" rx="8" fill="rgba(249,115,22,0.08)" stroke="#f97316" stroke-width="1.5"/>
                     <text x="245" y="75" text-anchor="middle" fill="#f97316" font-family="Syne, sans-serif" font-size="11" font-weight="700">Centralized Targeting</text>
                     <text x="245" y="92" text-anchor="middle" fill="#f97316" font-family="Syne, sans-serif" font-size="10">Service</text>
-                    <text x="245" y="105" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="7">Free Monad + Origin Map</text>
+                    <text x="245" y="105" text-anchor="middle" fill="#8892a8" font-family="Space Mono, monospace" font-size="7">Free Monad + Same Origin Map</text>
 
                     <!-- Arrow -->
                     <line x1="335" y1="85" x2="385" y2="85" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrowOrange)"/>
@@ -1100,7 +1100,7 @@
                 </div>
                 <div class="problem-card">
                     <div class="problem-title">Maintainability Barrier</div>
-                    <div class="problem-desc">Free monad program composed with cats and Finagle futures, interpreted by a lazy batch runner. Requires end-to-end understanding of the evaluation pipeline to maintain safely -- most engineers on the team could not confidently modify this code.</div>
+                    <div class="problem-desc">Free monad program composed with cats and Finagle futures, interpreted by a runner. Requires end-to-end understanding of the evaluation pipeline to maintain safely -- most engineers on the team could not confidently modify this code.</div>
                 </div>
                 <div class="problem-card">
                     <div class="problem-title">Security Blast Radius</div>
@@ -1108,11 +1108,11 @@
                 </div>
                 <div class="problem-card">
                     <div class="problem-title">Cross-team Coupling</div>
-                    <div class="problem-desc">Every data point definition needs to onboard to the central registry, adding friction for all product teams.</div>
+                    <div class="problem-desc">Every data point definition needs to be onboarded to the central registry, adding friction for all product teams.</div>
                 </div>
                 <div class="problem-card">
                     <div class="problem-title">Rigid Data Types</div>
-                    <div class="problem-desc">Fixed types: Number, String, Boolean, Date. No complex structures. Adding a type = ADT + evaluator + serialization changes.</div>
+                    <div class="problem-desc">Fixed types: Number, String, Boolean, Date. No complex structures. Adding a type = evaluator + serialization changes in multiple places.</div>
                 </div>
             </div>
         </div>
@@ -1136,10 +1136,10 @@
 
                     <!-- SDK Layer -->
                     <rect x="30" y="38" width="200" height="130" rx="8" fill="rgba(6,214,160,0.06)" stroke="#06d6a0" stroke-width="1" stroke-dasharray="4,3"/>
-                    <text x="130" y="57" text-anchor="middle" fill="#06d6a0" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">Federated Data Retrieval SDK</text>
+                    <text x="130" y="57" text-anchor="middle" fill="#06d6a0" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">Federated SDK</text>
                     <text x="130" y="72" text-anchor="middle" fill="#06d6a0" font-family="DM Sans, sans-serif" font-size="9">(TypeScript)</text>
                     <text x="45" y="80" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Local target rules</text>
-                    <text x="45" y="95" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Team-defined data points</text>
+                    <text x="45" y="95" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Team-defined data registry</text>
                     <text x="45" y="110" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Request-scoped data cache</text>
                     <text x="45" y="125" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Type-safe contracts</text>
                     <text x="45" y="140" fill="#8892a8" font-family="Space Mono, monospace" font-size="8">- Pluggable transformers</text>
@@ -1147,13 +1147,13 @@
                     <!-- Rust Bridge -->
                     <rect x="260" y="50" width="130" height="55" rx="8" fill="rgba(56,189,248,0.06)" stroke="#38bdf8" stroke-width="1"/>
                     <text x="325" y="72" text-anchor="middle" fill="#38bdf8" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">Rust Bridge</text>
-                    <text x="325" y="87" text-anchor="middle" fill="#38bdf8" font-family="DM Sans, sans-serif" font-size="9">(JNI / Napi)</text>
-                    <text x="325" y="100" text-anchor="middle" fill="#4a5568" font-family="Space Mono, monospace" font-size="7">memory-safe & high throughput</text>
+                    <text x="325" y="87" text-anchor="middle" fill="#38bdf8" font-family="DM Sans, sans-serif" font-size="9">(JNI / NAPI)</text>
+                    <text x="325" y="100" text-anchor="middle" fill="#4a5568" font-family="Space Mono, monospace" font-size="7">memory-safe & high-throughput</text>
 
                     <!-- JVM Rule Engine -->
                     <rect x="260" y="120" width="130" height="45" rx="8" fill="rgba(139,92,246,0.06)" stroke="#a78bfa" stroke-width="1"/>
                     <text x="325" y="140" text-anchor="middle" fill="#a78bfa" font-family="DM Sans, sans-serif" font-size="10" font-weight="600">JVM Rule Engine</text>
-                    <text x="325" y="155" text-anchor="middle" fill="#a78bfa" font-family="DM Sans, sans-serif" font-size="9">(Scala, unchanged)</text>
+                    <text x="325" y="155" text-anchor="middle" fill="#a78bfa" font-family="DM Sans, sans-serif" font-size="9">(Scala, unchanged except for no more Monad)</text>
 
                     <!-- Arrows between layers -->
                     <line x1="232" y1="80" x2="256" y2="77" stroke="#8892a8" stroke-width="1" marker-end="url(#arrowGray2)"/>
@@ -1174,10 +1174,7 @@
                     <rect x="595" y="75" width="160" height="30" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
                     <text x="675" y="95" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9">Team's ML Features</text>
                     <rect x="595" y="135" width="160" height="30" rx="5" fill="#0d2818" stroke="#06d6a0" stroke-width="1"/>
-                    <text x="675" y="155" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9">OtherSources</text>
-
-                    <!-- Annotation -->
-                    <text x="625" y="10" fill="#4a5568" font-family="Space Mono, monospace" font-size="7" font-style="italic">only team's own data</text>
+                    <text x="675" y="155" text-anchor="middle" fill="#06d6a0" font-family="Space Mono, monospace" font-size="9">Other Data Sources</text>
 
                     <defs>
                         <marker id="arrowTeal" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
@@ -1298,7 +1295,7 @@ Nested:    impossible</code>
     </section-->
 
     <!-- ===========================================
-         SLIDE 6: OUTCOMES & REFLECTIONS
+         SLIDE 5: OUTCOMES & REFLECTIONS
          =========================================== -->
     <section class="slide outcomes-slide grid-bg" data-title="Outcomes">
         <div class="slide-content">
@@ -1313,7 +1310,7 @@ Nested:    impossible</code>
                         <li>Federated Targeting SDK adopted by multiple product teams</li>
                         <li>First cross-runtime capability in production</li>
                         <li>Measurable latency and resilience improvements</li>
-                        <li>Centralized service progressively deprecated</li>
+                        <li>Centralized services progressively deprecated</li>
                     </ul>
                     <!--div style="margin-top: clamp(0.3rem, 0.6vw, 0.5rem);">
                         <div class="outcome-block-title" style="color: var(--accent-blue); font-size: var(--small-size);">Cross-Runtime Debugging</div>
@@ -1343,7 +1340,7 @@ Nested:    impossible</code>
             </div>
 
             <div class="reflection-box reveal">
-                "The Free Monad engine was elegant but became a maintenance liability. The right architecture is not the most optimal or elegant one -- it is the one your team can safely maintain and extend. Federation gave teams genuine autonomy and unlocked features they could not do before."
+                "The Free Monad engine was elegant but became a maintenance liability. The right architecture is not the most optimal one -- it is the one your team can safely maintain and extend. Federation gave product teams genuine autonomy and unlocked features they could not do before."
             </div>
         </div>
     </section>
