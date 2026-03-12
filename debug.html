@@ -634,7 +634,7 @@
                 </div>
             </div>
 
-            <p class="reveal" style="font-size: var(--small-size); color: var(--text-dim); max-width: min(75vw, 560px);"><strong style="color: var(--text-secondary);">Polly</strong> — A cross-runtime interoperability framework. Node and JVM call each other's functions through a shared Rust bridge. Function calls can pass with nested callbacks that chain across runtimes.</p>
+            <p class="reveal" style="font-size: var(--small-size); color: var(--text-dim); max-width: min(75vw, 560px);"><strong style="color: var(--text-secondary);">The Bridge</strong> — A cross-runtime interoperability framework. Node and JVM call each other's functions through a shared Rust bridge. Function calls can pass with nested callbacks that chain across runtimes.</p>
         </div>
     </section>
 
@@ -650,11 +650,10 @@
             </div>
 
             <div class="metric-pills reveal">
-                <div class="metric-pill"><div class="metric-pill-label">Snapshot 1</div><div class="metric-pill-value" style="color: var(--text-primary);">1.1 MB</div></div>
-                <div class="metric-pill"><div class="metric-pill-label">Snapshot 2</div><div class="metric-pill-value" style="color: var(--warning);">1.7 MB</div></div>
-                <div class="metric-pill"><div class="metric-pill-label">Snapshot 3</div><div class="metric-pill-value" style="color: var(--warning);">1.9 MB</div></div>
-                <div class="metric-pill"><div class="metric-pill-label">Snapshot 4</div><div class="metric-pill-value" style="color: var(--danger);">2.4 MB</div></div>
-                <div class="metric-pill"><div class="metric-pill-label">Growth</div><div class="metric-pill-value" style="color: var(--danger);">~21 B/alloc</div></div>
+                <div class="metric-pill"><div class="metric-pill-label">Snapshot 1</div><div class="metric-pill-value" style="color: var(--text-primary);">1.1 GB</div></div>
+                <div class="metric-pill"><div class="metric-pill-label">Snapshot 2</div><div class="metric-pill-value" style="color: var(--warning);">1.7 GB</div></div>
+                <div class="metric-pill"><div class="metric-pill-label">Snapshot 3</div><div class="metric-pill-value" style="color: var(--warning);">1.9 GB</div></div>
+                <div class="metric-pill"><div class="metric-pill-label">Snapshot 4</div><div class="metric-pill-value" style="color: var(--danger);">2.4 GB</div></div>
             </div>
 
             <h3 class="reveal" style="margin-top: clamp(0.15rem, 0.3vh, 0.25rem);">Key Challenges</h3>
@@ -674,7 +673,6 @@
                 </div>
             </div>
 
-            <div class="callout accent reveal max-w"><strong>Breakthrough:</strong> Leverage Mac OS environment variable <code style="font-size: inherit;">MallocStackLogging</code> + built-in utility <code style="font-size: inherit;">heap</code> for native memory snapshots. Pinpointed the root cause in seconds.</div>
         </div>
     </section>
 
@@ -712,9 +710,11 @@
                 </div>
             </div>
 
+            <!--div class="callout accent reveal max-w"><strong>Breakthrough:</strong> Leverage Mac OS environment variable <code style="font-size: inherit;">MallocStackLogging</code> + built-in utility <code style="font-size: inherit;">heap</code> for native memory snapshots. Pinpointed the root cause in seconds.</div-->
+
             <!-- Root cause -->
-            <div class="callout danger reveal max-w">
-                <strong>Root Cause:</strong> Each request to the capability initiated a set of new OTel metrics instances across JNI. On the Rust side, OTel instances are intentionally long-lived and allocated via <code style="font-size: inherit;">Box::into_raw</code> with no cleaner hooked. While JVM GC freed the tiny wrapper, the native allocation was orphaned. At <strong>5 req/s &times; 3 callbacks &times; ~10 metrics</strong> = hundreds of leaked allocations/sec.
+            <div class="callout reveal max-w">
+                <strong>Root Cause:</strong> Each request to JVM initiated a new set of OTel metrics instruments across JNI. On the Rust side, OTel instances are intentionally defined as long-lived thus with no cleaner hooked. While JVM GC freed the tiny wrapper, the native allocation was orphaned. At <strong>5 req/s &times; 3 callbacks &times; ~10 metrics</strong> = hundreds of leaked allocations/sec.
             </div>
 
             <!-- Fix -->
