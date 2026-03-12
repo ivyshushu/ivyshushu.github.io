@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debugging a Cross-Runtime Memory Leak</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;700;800;900&family=Nunito:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================================
+           CSS CUSTOM PROPERTIES (SWISS MODERN THEME)
+           =========================================== */
+        :root {
+            --bg-primary: #fafafa;
+            --bg-card: #ffffff;
+            --bg-code: #f0eeeb;
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --border-medium: rgba(0, 0, 0, 0.15);
+            --text-primary: #0a0a0a;
+            --text-secondary: #555555;
+            --text-dim: #999999;
+            --accent-red: #ff3300;
+            --accent-red-light: rgba(255, 51, 0, 0.06);
+            --accent-red-medium: rgba(255, 51, 0, 0.12);
+            --danger: #dc2626;
+            --danger-light: rgba(220, 38, 38, 0.06);
+            --danger-border: rgba(220, 38, 38, 0.18);
+            --success: #16a34a;
+            --success-light: rgba(22, 163, 74, 0.06);
+            --success-border: rgba(22, 163, 74, 0.18);
+            --warning: #d97706;
+            --warning-light: rgba(217, 119, 6, 0.06);
+            --warning-border: rgba(217, 119, 6, 0.18);
+            --rust-orange: #c2410c;
+            --jvm-blue: #2563eb;
+            --node-green: #16a34a;
+
+            --font-display: 'Archivo', sans-serif;
+            --font-body: 'Nunito', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            --title-size: clamp(1.8rem, 5vw, 3.8rem);
+            --h2-size: clamp(1.2rem, 3vw, 2.2rem);
+            --h3-size: clamp(0.85rem, 1.6vw, 1.15rem);
+            --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+            --small-size: clamp(0.6rem, 0.9vw, 0.78rem);
+            --mono-size: clamp(0.55rem, 0.85vw, 0.72rem);
+            --slide-padding: clamp(1.5rem, 4vw, 4rem);
+            --content-gap: clamp(0.6rem, 1.5vw, 1.4rem);
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --duration-normal: 0.6s;
+        }
+
+        /* ===========================================
+           BASE RESET
+           =========================================== */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ===========================================
+           VIEWPORT FITTING (from viewport-base.css)
+           =========================================== */
+        html, body { height: 100%; overflow-x: hidden; }
+        html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-height: 100%;
+            overflow: hidden;
+            padding: var(--slide-padding);
+            padding-left: clamp(2.5rem, 6vw, 6rem);
+        }
+
+        /* ===========================================
+           SWISS GRID BACKGROUND
+           Visible structural grid lines
+           =========================================== */
+        .grid-bg::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background-image:
+                linear-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 0, 0, 0.035) 1px, transparent 1px);
+            background-size: clamp(35px, 4.5vw, 55px) clamp(35px, 4.5vw, 55px);
+        }
+
+        /* ===========================================
+           RED ACCENT BAR (left edge)
+           Signature Swiss Modern element
+           =========================================== */
+        .accent-bar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: clamp(4px, 0.35vw, 5px);
+            height: 100%;
+            background: var(--accent-red);
+            z-index: 1000;
+        }
+
+        /* ===========================================
+           RESPONSIVE BREAKPOINTS
+           =========================================== */
+        @media (max-height: 700px) {
+            :root {
+                --slide-padding: clamp(0.6rem, 2.5vw, 1.5rem);
+                --content-gap: clamp(0.3rem, 1vw, 0.8rem);
+                --title-size: clamp(1.2rem, 4vw, 2.2rem);
+                --h2-size: clamp(1rem, 2.5vw, 1.6rem);
+            }
+            .slide-content { padding-left: clamp(1.5rem, 4vw, 3rem); }
+        }
+        @media (max-height: 600px) {
+            :root {
+                --slide-padding: clamp(0.4rem, 2vw, 1rem);
+                --body-size: clamp(0.6rem, 1vw, 0.85rem);
+            }
+            .nav-dots, .decorative { display: none; }
+        }
+        @media (max-height: 500px) {
+            :root {
+                --title-size: clamp(1rem, 3.5vw, 1.5rem);
+                --h2-size: clamp(0.85rem, 2.2vw, 1.2rem);
+            }
+        }
+        @media (max-width: 600px) {
+            :root { --title-size: clamp(1.2rem, 7vw, 2.5rem); }
+            .slide-content { padding-left: var(--slide-padding); }
+            .two-col, .method-steps, .challenge-grid { grid-template-columns: 1fr !important; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important;
+            }
+            html { scroll-behavior: auto; }
+        }
+
+        /* ===========================================
+           GLOBAL TYPOGRAPHY
+           Archivo for display, Nunito for body
+           =========================================== */
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            -webkit-font-smoothing: antialiased;
+        }
+        h1, h2, h3 {
+            font-family: var(--font-display);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: var(--text-primary);
+        }
+        h1 { font-size: var(--title-size); line-height: 1.05; }
+        h2 { font-size: var(--h2-size); line-height: 1.15; }
+        h3 { font-size: var(--h3-size); line-height: 1.25; }
+        p, li { font-size: var(--body-size); line-height: 1.55; color: var(--text-secondary); }
+        code { font-family: var(--font-mono); font-size: var(--mono-size); }
+
+        /* ===========================================
+           ANIMATIONS
+           Slide from left (Swiss editorial feel)
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateX(-25px);
+            transition: opacity var(--duration-normal) var(--ease-out-expo),
+                        transform var(--duration-normal) var(--ease-out-expo);
+        }
+        .slide.visible .reveal { opacity: 1; transform: translateX(0); }
+        .reveal:nth-child(1) { transition-delay: 0.05s; }
+        .reveal:nth-child(2) { transition-delay: 0.12s; }
+        .reveal:nth-child(3) { transition-delay: 0.19s; }
+        .reveal:nth-child(4) { transition-delay: 0.26s; }
+        .reveal:nth-child(5) { transition-delay: 0.33s; }
+        .reveal:nth-child(6) { transition-delay: 0.40s; }
+
+        .reveal-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.7s var(--ease-out-expo), transform 0.7s var(--ease-out-expo);
+        }
+        .slide.visible .reveal-scale { opacity: 1; transform: scale(1); }
+
+        /* ===========================================
+           PROGRESS BAR
+           =========================================== */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: var(--accent-red);
+            z-index: 1001;
+            transition: width 0.3s ease;
+        }
+
+        /* ===========================================
+           NAV DOTS
+           =========================================== */
+        .nav-dots {
+            position: fixed;
+            right: clamp(0.6rem, 1.5vw, 1.2rem);
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(6px, 1vh, 12px);
+            z-index: 100;
+        }
+        .nav-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--border-medium);
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0;
+        }
+        .nav-dot.active {
+            background: var(--accent-red);
+            box-shadow: 0 0 0 3px var(--accent-red-light);
+            transform: scale(1.5);
+        }
+
+        /* ===========================================
+           SLIDE LABELS AND NUMBERS
+           =========================================== */
+        .slide-number {
+            position: absolute;
+            top: var(--slide-padding);
+            right: var(--slide-padding);
+            font-family: var(--font-display);
+            font-size: clamp(3rem, 8vw, 7rem);
+            font-weight: 900;
+            color: rgba(0, 0, 0, 0.03);
+            line-height: 1;
+        }
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: var(--small-size);
+            color: var(--accent-red);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-weight: 500;
+            margin-bottom: clamp(0.15rem, 0.3vh, 0.3rem);
+        }
+
+        /* ===========================================
+           TITLE SLIDE
+           =========================================== */
+        .title-slide .slide-content {
+            gap: clamp(0.6rem, 1.5vh, 1.4rem);
+        }
+        .title-tag {
+            font-family: var(--font-mono);
+            font-size: var(--small-size);
+            color: var(--accent-red);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            font-weight: 500;
+        }
+        .title-slide h1 span {
+            color: var(--accent-red);
+        }
+
+        /* ===========================================
+           ARCHITECTURE ROW
+           Connected boxes with red dot connectors
+           =========================================== */
+        .arch-row {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            width: fit-content;
+        }
+        .arch-box {
+            padding: clamp(0.5rem, 1vw, 0.8rem) clamp(0.8rem, 1.5vw, 1.5rem);
+            border: clamp(1px, 0.12vw, 2px) solid var(--text-primary);
+            text-align: center;
+            background: var(--bg-card);
+        }
+        .arch-box:first-of-type { border-radius: 4px 0 0 4px; }
+        .arch-box:last-of-type { border-radius: 0 4px 4px 0; }
+        .arch-box-label {
+            font-family: var(--font-display);
+            font-size: clamp(0.8rem, 1.4vw, 1.1rem);
+            font-weight: 700;
+        }
+        .arch-box.node .arch-box-label { color: var(--node-green); }
+        .arch-box.rust .arch-box-label { color: var(--rust-orange); }
+        .arch-box.jvm .arch-box-label { color: var(--jvm-blue); }
+        .arch-box-detail {
+            font-family: var(--font-mono);
+            font-size: clamp(0.45rem, 0.65vw, 0.55rem);
+            color: var(--text-dim);
+            margin-top: 0.15em;
+        }
+        .arch-connector {
+            width: clamp(25px, 3.5vw, 45px);
+            height: clamp(1px, 0.12vw, 2px);
+            background: var(--accent-red);
+            position: relative;
+            flex-shrink: 0;
+        }
+        .arch-connector::before {
+            content: '';
+            position: absolute;
+            right: -3px; top: -3px;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--accent-red);
+        }
+        .arch-connector::after {
+            content: '';
+            position: absolute;
+            left: -3px; top: -3px;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--accent-red);
+        }
+
+        /* ===========================================
+           METRIC PILLS
+           =========================================== */
+        .metric-pills {
+            display: flex;
+            gap: clamp(0.3rem, 0.8vw, 0.6rem);
+            flex-wrap: wrap;
+        }
+        .metric-pill {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 3px;
+            padding: clamp(0.2rem, 0.4vw, 0.35rem) clamp(0.5rem, 1vw, 0.8rem);
+            text-align: center;
+        }
+        .metric-pill-label {
+            font-family: var(--font-mono);
+            font-size: clamp(0.4rem, 0.55vw, 0.5rem);
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .metric-pill-value {
+            font-family: var(--font-display);
+            font-size: clamp(0.85rem, 1.5vw, 1.2rem);
+            font-weight: 900;
+        }
+
+        /* ===========================================
+           CHALLENGE GRID (Slide 2)
+           3-column cards with top accent border
+           =========================================== */
+        .challenge-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.4rem, 1vw, 0.8rem);
+            width: 100%;
+            max-width: min(92vw, 900px);
+        }
+        .challenge-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            padding: clamp(0.5rem, 1vw, 0.9rem);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.15rem, 0.3vh, 0.3rem);
+        }
+        .challenge-card-title {
+            font-family: var(--font-display);
+            font-size: clamp(0.7rem, 1vw, 0.88rem);
+            font-weight: 700;
+        }
+        .challenge-card-body {
+            font-size: clamp(0.55rem, 0.8vw, 0.72rem);
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        /* ===========================================
+           CALLOUT BOX
+           Breakthrough / root cause highlights
+           =========================================== */
+        .callout {
+            font-family: var(--font-mono);
+            font-size: var(--small-size);
+            padding: clamp(0.3rem, 0.6vw, 0.5rem) clamp(0.5rem, 1vw, 0.8rem);
+            border-radius: 3px;
+            line-height: 1.4;
+            max-width: min(92vw, 900px);
+        }
+        .callout.accent {
+            background: var(--accent-red-light);
+            border-left: 3px solid var(--accent-red);
+            color: var(--text-primary);
+        }
+        .callout.danger {
+            background: var(--danger-light);
+            border-left: 3px solid var(--danger);
+            color: var(--text-primary);
+        }
+
+        /* ===========================================
+           METHOD STEPS (Slide 3 phases)
+           =========================================== */
+        .method-steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: clamp(0.3rem, 0.8vw, 0.6rem);
+            width: 100%;
+            max-width: min(92vw, 900px);
+        }
+        .method-step {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            padding: clamp(0.5rem, 1vw, 0.9rem);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.1rem, 0.2vh, 0.2rem);
+            position: relative;
+            overflow: hidden;
+        }
+        .method-step::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+        }
+        .method-step:nth-child(1)::before { background: var(--accent-red); }
+        .method-step:nth-child(2)::before { background: var(--jvm-blue); }
+        .method-step:nth-child(3)::before { background: var(--rust-orange); }
+        .method-step:nth-child(4)::before { background: var(--success); }
+        .method-num {
+            font-family: var(--font-mono);
+            font-size: clamp(0.45rem, 0.65vw, 0.55rem);
+            color: var(--text-dim);
+            letter-spacing: 0.08em;
+        }
+        .method-title {
+            font-family: var(--font-display);
+            font-size: clamp(0.8rem, 1.3vw, 1.05rem);
+            font-weight: 800;
+        }
+        .method-step:nth-child(1) .method-title { color: var(--accent-red); }
+        .method-step:nth-child(2) .method-title { color: var(--jvm-blue); }
+        .method-step:nth-child(3) .method-title { color: var(--rust-orange); }
+        .method-step:nth-child(4) .method-title { color: var(--success); }
+        .method-desc {
+            font-size: clamp(0.5rem, 0.75vw, 0.68rem);
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* ===========================================
+           TWO-COLUMN LAYOUT
+           =========================================== */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(0.5rem, 1.2vw, 1rem);
+            width: 100%;
+            max-width: min(92vw, 900px);
+        }
+
+        /* ===========================================
+           COMPARE BOXES (before/after code)
+           =========================================== */
+        .compare-box {
+            border-radius: 4px;
+            padding: clamp(0.4rem, 0.8vw, 0.7rem);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.15rem, 0.3vh, 0.3rem);
+        }
+        .compare-box.before {
+            background: var(--danger-light);
+            border: 1px solid var(--danger-border);
+        }
+        .compare-box.after {
+            background: var(--success-light);
+            border: 1px solid var(--success-border);
+        }
+        .compare-box.workflow {
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid var(--border-medium);
+        }
+        .compare-label {
+            font-family: var(--font-mono);
+            font-size: clamp(0.45rem, 0.65vw, 0.58rem);
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        .compare-box.before .compare-label { color: var(--danger); }
+        .compare-box.after .compare-label { color: var(--success); }
+        .compare-box.workflow .compare-label { color: var(--text-primary); }
+        .compare-code {
+            font-family: var(--font-mono);
+            font-size: var(--mono-size);
+            line-height: 1.55;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.04);
+            padding: clamp(0.25rem, 0.5vw, 0.4rem);
+            border-radius: 2px;
+        }
+        .hl-bad { color: var(--danger); }
+        .hl-good { color: var(--success); }
+        .hl-dim { color: var(--text-dim); }
+        .hl-accent { color: var(--accent-red); }
+
+        /* ===========================================
+           IMPACT GRID (Slide 4)
+           =========================================== */
+        .impact-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: clamp(0.3rem, 0.8vw, 0.6rem);
+            width: 100%;
+            max-width: min(92vw, 900px);
+        }
+        .impact-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 4px;
+            padding: clamp(0.5rem, 1vw, 0.9rem);
+            display: flex;
+            flex-direction: column;
+            gap: clamp(0.15rem, 0.3vh, 0.3rem);
+        }
+        .impact-card-title {
+            font-family: var(--font-display);
+            font-size: clamp(0.7rem, 1vw, 0.88rem);
+            font-weight: 700;
+        }
+        .impact-card-body {
+            font-size: clamp(0.55rem, 0.8vw, 0.72rem);
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        /* ===========================================
+           CLOSING SLIDE
+           =========================================== */
+        .closing-slide .slide-content {
+            align-items: flex-start;
+        }
+        .closing-rule {
+            width: clamp(35px, 5vw, 50px);
+            height: 2px;
+            background: var(--accent-red);
+            border: none;
+        }
+        .closing-stats {
+            display: flex;
+            gap: clamp(1.5rem, 4vw, 3.5rem);
+        }
+        .closing-stat-label {
+            font-family: var(--font-mono);
+            font-size: clamp(0.45rem, 0.65vw, 0.55rem);
+            color: var(--text-dim);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 0.2em;
+        }
+        .closing-stat-value {
+            font-family: var(--font-display);
+            font-size: var(--h3-size);
+            font-weight: 800;
+        }
+
+        /* ===========================================
+           UTILITY CLASSES
+           =========================================== */
+        .gap-sm { gap: clamp(0.3rem, 0.6vh, 0.6rem); }
+        .gap-md { gap: var(--content-gap); }
+        .max-w { max-width: min(92vw, 900px); }
+    </style>
+</head>
+<body>
+
+    <!-- === FIXED ELEMENTS === -->
+    <div class="accent-bar"></div>
+    <div class="progress-bar" id="progressBar"></div>
+    <nav class="nav-dots" id="navDots" aria-label="Slide navigation"></nav>
+
+    <!-- ===========================================
+         SLIDE 1: TITLE + CONTEXT
+         =========================================== -->
+    <section class="slide title-slide grid-bg">
+        <span class="slide-number">00</span>
+        <div class="slide-content">
+            <div class="title-tag reveal">Case Study</div>
+            <h1 class="reveal">Debugging a <span>Cross-Runtime</span> Memory Leak</h1>
+            <p class="reveal" style="font-size: clamp(0.8rem, 1.3vw, 1.05rem); color: var(--text-secondary); max-width: min(75vw, 600px);">A native memory leak investigation across three runtimes — found with a local-first debug approach, fixed with a one-line change, and turned into a team-wide learning moment.</p>
+
+            <div class="arch-row reveal-scale">
+                <div class="arch-box node">
+                    <div class="arch-box-label">Node.js</div>
+                    <div class="arch-box-detail">NAPI</div>
+                </div>
+                <div class="arch-connector"></div>
+                <div class="arch-box rust">
+                    <div class="arch-box-label">Rust Bridge</div>
+                    <div class="arch-box-detail">Linked Registry</div>
+                </div>
+                <div class="arch-connector"></div>
+                <div class="arch-box jvm">
+                    <div class="arch-box-label">JVM</div>
+                    <div class="arch-box-detail">JNI</div>
+                </div>
+            </div>
+
+            <p class="reveal" style="font-size: var(--small-size); color: var(--text-dim); max-width: min(75vw, 560px);"><strong style="color: var(--text-secondary);">Polly</strong> — A cross-runtime interoperability framework. Node and JVM call each other's functions through a shared Rust bridge. Function calls can pass with nested callbacks that chain across runtimes.</p>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 2: THE PROBLEM
+         =========================================== -->
+    <section class="slide grid-bg">
+        <span class="slide-number">01</span>
+        <div class="slide-content gap-sm" style="align-items: flex-start;">
+            <div class="reveal">
+                <div class="section-label">The Problem</div>
+                <h2>A Tricky Problem — Three Runtimes, Three Memory Models</h2>
+            </div>
+
+            <div class="metric-pills reveal">
+                <div class="metric-pill"><div class="metric-pill-label">Snapshot 1</div><div class="metric-pill-value" style="color: var(--text-primary);">1.1 MB</div></div>
+                <div class="metric-pill"><div class="metric-pill-label">Snapshot 2</div><div class="metric-pill-value" style="color: var(--warning);">1.7 MB</div></div>
+                <div class="metric-pill"><div class="metric-pill-label">Snapshot 3</div><div class="metric-pill-value" style="color: var(--warning);">1.9 MB</div></div>
+                <div class="metric-pill"><div class="metric-pill-label">Snapshot 4</div><div class="metric-pill-value" style="color: var(--danger);">2.4 MB</div></div>
+                <div class="metric-pill"><div class="metric-pill-label">Growth</div><div class="metric-pill-value" style="color: var(--danger);">~21 B/alloc</div></div>
+            </div>
+
+            <h3 class="reveal" style="margin-top: clamp(0.15rem, 0.3vh, 0.25rem);">Key Challenges</h3>
+
+            <div class="challenge-grid reveal">
+                <div class="challenge-card" style="border-top: 2px solid var(--rust-orange);">
+                    <div class="challenge-card-title" style="color: var(--rust-orange);">1. Cross-Runtime Ownership is Novel</div>
+                    <div class="challenge-card-body">The framework spans three runtimes with interleaved Rust/JNI/NAPI layers and data crosses the boundary with non-obvious ownership transfer.</div>
+                </div>
+                <div class="challenge-card" style="border-top: 2px solid var(--jvm-blue);">
+                    <div class="challenge-card-title" style="color: var(--jvm-blue);">2. Complex Codebase, No Guide</div>
+                    <div class="challenge-card-body">The primary owner was unavailable during the investigation, so we had to learn the codebase with little help.</div>
+                </div>
+                <div class="challenge-card" style="border-top: 2px solid var(--warning);">
+                    <div class="challenge-card-title" style="color: var(--warning);">3. No Native Profiling Experience</div>
+                    <div class="challenge-card-body">We had to learn native profiling from scratch to get visibility into the right layer.</div>
+                </div>
+            </div>
+
+            <div class="callout accent reveal max-w"><strong>Breakthrough:</strong> Leverage Mac OS environment variable <code style="font-size: inherit;">MallocStackLogging</code> + built-in utility <code style="font-size: inherit;">heap</code> for native memory snapshots. Pinpointed the root cause in seconds.</div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 3: APPROACH + FIX
+         =========================================== -->
+    <section class="slide grid-bg">
+        <span class="slide-number">02</span>
+        <div class="slide-content gap-sm" style="align-items: flex-start;">
+            <div class="reveal">
+                <div class="section-label">Local-First Debug Approach</div>
+                <h2>Reproduce, Profile, Fix, Prove</h2>
+            </div>
+
+            <div class="method-steps reveal">
+                <div class="method-step">
+                    <div class="method-num">PHASE 1</div>
+                    <div class="method-title">Reproduce</div>
+                    <div class="method-desc">Sustained load test with memory tracking across all 3 runtimes. Confirmed Node and JVM heaps stable — leak is in native.</div>
+                </div>
+                <div class="method-step">
+                    <div class="method-num">PHASE 2</div>
+                    <div class="method-title">Profile</div>
+                    <div class="method-desc">Enable <code style="font-size: inherit;">MallocStackLogging</code>, take <code style="font-size: inherit;">heap</code> snapshots, diff to find growing allocations with stack traces.</div>
+                </div>
+                <div class="method-step">
+                    <div class="method-num">PHASE 3</div>
+                    <div class="method-title">Fix</div>
+                    <div class="method-desc">Cache metrics as <code style="font-size: inherit;">val</code> fields — one allocation at init instead of per-request.</div>
+                </div>
+                <div class="method-step">
+                    <div class="method-num">PHASE 4</div>
+                    <div class="method-title">Prove</div>
+                    <div class="method-desc">Re-run same load test. Before/after heap comparison. Flat RSS confirmed.</div>
+                </div>
+            </div>
+
+            <!-- Root cause -->
+            <div class="callout danger reveal max-w">
+                <strong>Root Cause:</strong> Each request to the capability initiated a set of new OTel metrics instances across JNI. On the Rust side, OTel instances are intentionally long-lived and allocated via <code style="font-size: inherit;">Box::into_raw</code> with no cleaner hooked. While JVM GC freed the tiny wrapper, the native allocation was orphaned. At <strong>5 req/s &times; 3 callbacks &times; ~10 metrics</strong> = hundreds of leaked allocations/sec.
+            </div>
+
+            <!-- Fix -->
+            <div class="two-col reveal">
+                <div class="compare-box before">
+                    <div class="compare-label">Before: per-request allocation</div>
+                    <div class="compare-code">
+                        <span class="hl-dim">// New Rust alloc every call</span><br>
+                        def eligibilityRequest(id) =<br>
+                        &nbsp;&nbsp;metrics<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="hl-bad">.counter("portals.request")</span><br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;.increment(tags)
+                    </div>
+                </div>
+                <div class="compare-box after">
+                    <div class="compare-label">After: cached singleton</div>
+                    <div class="compare-code">
+                        <span class="hl-dim">// Created once at init</span><br>
+                        <span class="hl-good">private val counter =</span><br>
+                        <span class="hl-good">&nbsp;&nbsp;metrics.counter("portals.request")</span><br><br>
+                        def eligibilityRequest(id) =<br>
+                        &nbsp;&nbsp;counter.increment(tags)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 4: IMPACT
+         =========================================== -->
+    <section class="slide grid-bg">
+        <span class="slide-number">03</span>
+        <div class="slide-content gap-md" style="align-items: flex-start;">
+            <div class="reveal">
+                <div class="section-label">Impact</div>
+                <h2>Beyond the Fix</h2>
+            </div>
+
+            <div class="impact-grid">
+                <div class="impact-card reveal" style="border-top: 2px solid var(--danger);">
+                    <div class="impact-card-title" style="color: var(--danger);">Unblocked Product Launch</div>
+                    <div class="impact-card-body">The memory leak was a launch blocker for a new product feature built on nested callbacks. Identifying and fixing the issue unblocked the product team from shipping to production in time.</div>
+                </div>
+                <div class="impact-card reveal" style="border-top: 2px solid var(--rust-orange);">
+                    <div class="impact-card-title" style="color: var(--rust-orange);">Framework Hardening</div>
+                    <div class="impact-card-body">Identified a systemic gap in the framework: JNI wrappers for metrics lacked destructors. Filed and scoped long-term fix to add Drop/Cleaner to all native pointer wrappers, preventing future leaks for any capability author.</div>
+                </div>
+                <div class="impact-card reveal" style="border-top: 2px solid var(--jvm-blue);">
+                    <div class="impact-card-title" style="color: var(--jvm-blue);">Cross-Functional Collaboration</div>
+                    <div class="impact-card-body">Worked across the framework team and product team to coordinate debugging, validate the fix in staging, and establish native memory monitoring in production dashboards.</div>
+                </div>
+                <div class="impact-card reveal" style="border-top: 2px solid var(--accent-red);">
+                    <div class="impact-card-title" style="color: var(--accent-red);">Knowledge Transfer</div>
+                    <div class="impact-card-body">Ran a team walkthrough on cross-runtime memory analysis so others can independently debug similar issues.</div>
+                </div>
+                <div class="impact-card reveal" style="border-top: 2px solid var(--success);">
+                    <div class="impact-card-title" style="color: var(--success);">Operational Guardrails</div>
+                    <div class="impact-card-body">Established sustained load test patterns and add native RSS to the benchmark testing for leak detection.</div>
+                </div>
+                <div class="impact-card reveal" style="border-top: 2px solid var(--warning);">
+                    <div class="impact-card-title" style="color: var(--warning);">Team Capability Building</div>
+                    <div class="impact-card-body">Mentored engineers on Rust ownership semantics, native memory profiling with Instruments, and the principle that JVM GC does not manage native resources. Raised the team's debugging baseline for cross-runtime systems.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===========================================
+         SLIDE 5: CLOSING
+         =========================================== -->
+    <section class="slide closing-slide grid-bg">
+        <span class="slide-number">04</span>
+        <div class="slide-content gap-md">
+            <hr class="closing-rule reveal">
+            <h2 class="reveal" style="max-width: min(75vw, 650px); line-height: 1.2;">Cross-runtime bugs hide in the gaps between memory models.</h2>
+            <p class="reveal" style="max-width: min(70vw, 520px); font-size: var(--body-size);">The fix was a one-line change. Finding it required understanding three runtimes and their ownership boundaries. The real impact was turning one engineer's investigation into repeatable team knowledge.</p>
+
+            <div class="closing-stats reveal">
+                <div>
+                    <div class="closing-stat-label">Approach</div>
+                    <div class="closing-stat-value" style="color: var(--accent-red);">Local-First</div>
+                </div>
+                <div>
+                    <div class="closing-stat-label">Fix</div>
+                    <div class="closing-stat-value" style="color: var(--rust-orange);">Targeted</div>
+                </div>
+                <div>
+                    <div class="closing-stat-label">Framework</div>
+                    <div class="closing-stat-value" style="color: var(--jvm-blue);">Hardened</div>
+                </div>
+                <div>
+                    <div class="closing-stat-label">Team</div>
+                    <div class="closing-stat-value" style="color: var(--success);">Upleveled</div>
+                </div>
+            </div>
+
+            <hr class="closing-rule reveal">
+        </div>
+    </section>
+
+    <!-- ===========================================
+       SLIDE PRESENTATION CONTROLLER
+       =========================================== -->
+    <script>
+        class SlidePresentation {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.setupIntersectionObserver();
+                this.setupKeyboardNav();
+                this.setupTouchNav();
+                this.setupProgressBar();
+                this.setupNavDots();
+            }
+
+            setupIntersectionObserver() {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            entry.target.classList.add('visible');
+                            const i = Array.from(this.slides).indexOf(entry.target);
+                            if (i !== -1) {
+                                this.currentSlide = i;
+                                this.updateNavDots();
+                                this.updateProgressBar();
+                            }
+                        }
+                    });
+                }, { threshold: 0.4 });
+                this.slides.forEach(s => observer.observe(s));
+            }
+
+            setupKeyboardNav() {
+                document.addEventListener('keydown', (e) => {
+                    if (['ArrowDown', 'ArrowRight', ' ', 'PageDown'].includes(e.key)) {
+                        e.preventDefault();
+                        this.goToSlide(this.currentSlide + 1);
+                    } else if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) {
+                        e.preventDefault();
+                        this.goToSlide(this.currentSlide - 1);
+                    } else if (e.key === 'Home') {
+                        e.preventDefault();
+                        this.goToSlide(0);
+                    } else if (e.key === 'End') {
+                        e.preventDefault();
+                        this.goToSlide(this.slides.length - 1);
+                    }
+                });
+            }
+
+            setupTouchNav() {
+                let sy = 0, sx = 0;
+                document.addEventListener('touchstart', (e) => {
+                    sy = e.touches[0].clientY;
+                    sx = e.touches[0].clientX;
+                }, { passive: true });
+                document.addEventListener('touchend', (e) => {
+                    const dy = sy - e.changedTouches[0].clientY;
+                    const dx = sx - e.changedTouches[0].clientX;
+                    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 50) {
+                        dy > 0
+                            ? this.goToSlide(this.currentSlide + 1)
+                            : this.goToSlide(this.currentSlide - 1);
+                    }
+                }, { passive: true });
+            }
+
+            setupProgressBar() {
+                this.progressBar = document.getElementById('progressBar');
+                this.updateProgressBar();
+            }
+
+            updateProgressBar() {
+                if (this.progressBar) {
+                    this.progressBar.style.width =
+                        ((this.currentSlide + 1) / this.slides.length * 100) + '%';
+                }
+            }
+
+            setupNavDots() {
+                const nav = document.getElementById('navDots');
+                if (!nav) return;
+                this.slides.forEach((_, i) => {
+                    const d = document.createElement('button');
+                    d.className = 'nav-dot' + (i === 0 ? ' active' : '');
+                    d.setAttribute('aria-label', `Slide ${i + 1}`);
+                    d.addEventListener('click', () => this.goToSlide(i));
+                    nav.appendChild(d);
+                });
+                this.dots = nav.querySelectorAll('.nav-dot');
+            }
+
+            updateNavDots() {
+                if (this.dots) {
+                    this.dots.forEach((d, i) =>
+                        d.classList.toggle('active', i === this.currentSlide)
+                    );
+                }
+            }
+
+            goToSlide(i) {
+                if (i >= 0 && i < this.slides.length) {
+                    this.slides[i].scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        }
+
+        new SlidePresentation();
+    </script>
+</body>
+</html>
