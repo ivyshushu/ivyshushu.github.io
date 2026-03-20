@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:"Segoe UI",system-ui,sans-serif;background:#0f0f14;color:#e8e6df;min-height:100vh;display:flex;flex-direction:column}
+        .deck{flex:1;display:flex;flex-direction:column;max-width:900px;margin:0 auto;width:100%;padding:24px 20px 80px}
+        .nav{display:flex;align-items:center;justify-content:space-between;padding:12px 0 24px;border-bottom:0.5px solid rgba(255,255,255,.1);margin-bottom:32px}
+        .nav-title{font-size:13px;color:rgba(255,255,255,.4);letter-spacing:.04em;text-transform:uppercase}
+        .slide-indicators{display:flex;gap:8px;align-items:center}
+        .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);cursor:pointer;transition:all .2s}
+        .dot.active{background:#7f77dd;width:24px;border-radius:4px}
+        .controls{display:flex;gap:8px}
+        .btn{background:rgba(255,255,255,.06);border:0.5px solid rgba(255,255,255,.15);color:#e8e6df;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:13px;transition:all .15s}
+        .btn:hover{background:rgba(255,255,255,.12)}
+        .btn:disabled{opacity:.3;cursor:default}
+        .slide{display:none;animation:fadeIn .3s ease}
+        .slide.active{display:block}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+        /* Slide typography */
+        .slide-label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#7f77dd;margin-bottom:10px;font-weight:500}
+        .slide-title{font-size:32px;font-weight:600;line-height:1.2;margin-bottom:8px;color:#fff}
+        .slide-subtitle{font-size:16px;color:rgba(255,255,255,.5);margin-bottom:32px;line-height:1.5}
+        .slide-body{font-size:15px;line-height:1.7;color:rgba(255,255,255,.75)}
+
+        /* Cards */
+        .card-grid{display:grid;gap:12px;margin-bottom:20px}
+        .card-grid.cols-2{grid-template-columns:1fr 1fr}
+        .card-grid.cols-3{grid-template-columns:1fr 1fr 1fr}
+        .card{background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:10px;padding:16px 18px}
+        .card-title{font-size:13px;font-weight:600;color:#fff;margin-bottom:6px}
+        .card-body{font-size:13px;color:rgba(255,255,255,.55);line-height:1.6}
+        .card.accent-purple{border-color:rgba(127,119,221,.4);background:rgba(127,119,221,.08)}
+        .card.accent-teal{border-color:rgba(29,158,117,.35);background:rgba(29,158,117,.07)}
+        .card.accent-amber{border-color:rgba(186,117,23,.35);background:rgba(186,117,23,.07)}
+        .card.accent-coral{border-color:rgba(216,90,48,.35);background:rgba(216,90,48,.07)}
+
+        /* Pill badges */
+        .pill{display:inline-block;font-size:11px;padding:2px 9px;border-radius:20px;font-weight:500;margin-bottom:10px}
+        .pill-purple{background:rgba(127,119,221,.2);color:#afa9ec}
+        .pill-teal{background:rgba(29,158,117,.2);color:#5dcaa5}
+        .pill-amber{background:rgba(186,117,23,.2);color:#ef9f27}
+        .pill-red{background:rgba(226,75,74,.2);color:#f09595}
+
+        /* Challenges / benefits list */
+        .item-list{list-style:none;display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+        .item-list li{font-size:13px;color:rgba(255,255,255,.65);padding-left:20px;position:relative;line-height:1.5}
+        .item-list li::before{position:absolute;left:0;top:0;font-size:12px}
+        .item-list.pros li::before{content:"✓";color:#5dcaa5}
+        .item-list.cons li::before{content:"✕";color:#f09595}
+        .item-list.neutral li::before{content:"→";color:#7f77dd}
+
+        /* Layer diagram */
+        .layers{display:flex;flex-direction:column;gap:4px;margin:20px 0}
+        .layer{border-radius:8px;padding:14px 18px;border:0.5px solid transparent}
+        .layer-1{background:rgba(127,119,221,.12);border-color:rgba(127,119,221,.3)}
+        .layer-2{background:rgba(29,158,117,.1);border-color:rgba(29,158,117,.25)}
+        .layer-3{background:rgba(186,117,23,.1);border-color:rgba(186,117,23,.25)}
+        .layer-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;opacity:.6;margin-bottom:3px}
+        .layer-name{font-size:14px;font-weight:600;color:#fff;margin-bottom:2px}
+        .layer-desc{font-size:12px;color:rgba(255,255,255,.5);line-height:1.5}
+
+        /* Evolution diagram */
+        .evo-stack{display:flex;flex-direction:column;gap:4px;margin:20px 0}
+        .evo-row{display:flex;align-items:center;gap:12px}
+        .evo-box{flex:1;background:rgba(255,255,255,.05);border:0.5px solid rgba(255,255,255,.12);border-radius:8px;padding:10px 14px}
+        .evo-box b{font-size:13px;font-weight:600;color:#fff;display:block;margin-bottom:2px}
+        .evo-box span{font-size:12px;color:rgba(255,255,255,.45)}
+        .evo-arrow{color:rgba(255,255,255,.25);font-size:18px;transform:rotate(90deg);flex-shrink:0}
+
+        /* Roadmap phases */
+        .phases{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}
+        .phase{background:rgba(255,255,255,.04);border:0.5px solid rgba(255,255,255,.1);border-radius:10px;padding:14px 16px}
+        .phase-num{font-size:10px;font-weight:700;letter-spacing:.1em;color:#7f77dd;text-transform:uppercase;margin-bottom:6px}
+        .phase-title{font-size:14px;font-weight:600;color:#fff;margin-bottom:6px}
+        .phase-items{list-style:none;font-size:12px;color:rgba(255,255,255,.5);display:flex;flex-direction:column;gap:4px}
+        .phase-items li{padding-left:14px;position:relative}
+        .phase-items li::before{content:"·";position:absolute;left:4px;color:rgba(255,255,255,.3)}
+
+        /* Two col layout */
+        .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+        .col-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.4);margin-bottom:10px}
+
+        /* Code-style block */
+        .code-block{background:rgba(0,0,0,.3);border:0.5px solid rgba(255,255,255,.08);border-radius:8px;padding:14px 16px;font-family:'Courier New',monospace;font-size:12px;color:#afa9ec;line-height:1.8;margin:16px 0 0 0}
+
+        /* Divider */
+        .divider{border:none;border-top:0.5px solid rgba(255,255,255,.08);margin:20px 0}
+
+        /* Bottom progress bar */
+        .progress-bar{position:fixed;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,.06)}
+        .progress-fill{height:100%;background:linear-gradient(90deg,#534ab7,#7f77dd);transition:width .3s ease}
+
+        @media(max-width:600px){
+            .card-grid.cols-2,.card-grid.cols-3,.two-col,.phases{grid-template-columns:1fr}
+            .slide-title{font-size:24px}
+        }
+    </style>
+</head>
+<body>
+<div class="deck">
+    <div class="nav">
+        <div class="slide-indicators">
+            <div class="dot active" onclick="goTo(0)"></div>
+            <div class="dot" onclick="goTo(1)"></div>
+            <div class="dot" onclick="goTo(2)"></div>
+            <div class="dot" onclick="goTo(3)"></div>
+            <div class="dot" onclick="goTo(4)"></div>
+        </div>
+        <div class="controls">
+            <button class="btn" id="prev-btn" onclick="prev()" disabled>← Prev</button>
+            <button class="btn" id="next-btn" onclick="next()">Next →</button>
+        </div>
+    </div>
+
+    <!-- Slide 0: Overview -->
+    <div class="slide active" id="slide-0">
+        <div class="slide-label">Overview</div>
+        <div class="slide-title">Federated Data Mesh Solution</div>
+        <div class="slide-subtitle">Transitioning from a service-centric architecture to a federated model that empowers product teams, boosts resilience, and accelerates AI product.</div>
+        <div class="card-grid cols-3">
+            <div class="card accent-purple">
+                <div class="card-title">🏗 Developer velocity</div>
+                <div class="card-body">Product teams ship faster when they don't have to manually do service integrations</div>
+            </div>
+            <div class="card accent-teal">
+                <div class="card-title">⚡ System resilience</div>
+                <div class="card-body">Eliminate single points of failure — blast radius contained per product</div>
+            </div>
+            <div class="card accent-amber">
+                <div class="card-title">🤖 GenAI-ready</div>
+                <div class="card-body">Lay the foundation for agent-driven, discoverable data access</div>
+            </div>
+        </div>
+        <hr class="divider"/>
+        <div class="slide-body" style="color:rgba(255,255,255,.45);font-size:13px">
+            Slide 1 → Problem &nbsp;·&nbsp; Slide 2 → Strategic pivot &nbsp;·&nbsp; Slide 3 → Impact &amp; roadmap
+        </div>
+    </div>
+
+    <!-- Slide 1: Problem -->
+    <div class="slide" id="slide-1">
+        <div class="slide-label">Slide 1 — Problem</div>
+        <div class="slide-title">The data assembly problem</div>
+        <div class="slide-subtitle">Evaluating a targeting rule is simple. Fetching the data is not — and at scale, the complexity compounds fast.</div>
+
+        <div class="card-grid cols-4" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+            <div class="card" style="text-align:center">
+                <div style="font-size:22px;font-weight:600;color:#afa9ec">50K</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">requests/min</div>
+            </div>
+            <div class="card" style="text-align:center">
+                <div style="font-size:22px;font-weight:600;color:#5dcaa5">1000+</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">content candidates per request</div>
+            </div>
+            <div class="card" style="text-align:center">
+                <div style="font-size:22px;font-weight:600;color:#ef9f27">5–10</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">data points per card</div>
+            </div>
+            <div class="card" style="text-align:center">
+                <div style="font-size:22px;font-weight:600;color:#f09595">4</div>
+                <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">service calls on complex surfaces</div>
+            </div>
+        </div>
+
+        <div class="card accent-purple" style="margin-bottom:16px">
+            <div class="card-title">A single rule, 3 underlying services</div>
+            <div class="code-block">IF(creditScore &gt; 700, income &gt; 50000 AND debt &lt; 10000, FALSE)</div>
+            <!--div class="card-body">Three fields. Three owning services. Three API calls, schemas, failure modes, and latency characteristics — multiplied across every card in every request, all within a strict latency budget.</div-->
+        </div>
+
+        <div class="three-col">
+            <div>
+                <div class="col-title">Current solution: Free monad interpreter</div>
+                <ul class="item-list pros" style="margin-bottom:6px">
+                    <li>Zero-code rule authoring for non-eng teams</li>
+                    <li>Simplified data access via platform abstractions</li>
+                    <li>Batching &amp; caching via static dep analysis</li>
+                </ul>
+            </div>
+            <div style="margin-top:10px;padding:10px 12px;background:rgba(127,119,221,.08);border-left:2px solid rgba(127,119,221,.5);border-radius:0 6px 6px 0;font-size:12px;color:rgba(255,255,255,.55);line-height:1.6">
+                <b style="color:#afa9ec;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Opportunity</b><br>
+                <ul class="item-list pros" style="margin-bottom:6px">
+                    <li>The data registry we own today is the seed of a <b style="color:#e8e6df">federated data mesh platform</b>.</li>
+                    <li>The data assembly solution could evolve into a simplified, governed data access, platform-level <b style="color:#e8e6df">data SDK</b>.</li>
+                </ul>
+            </div>
+            <div>
+                <div class="col-title">Gaps</div>
+                <ul class="item-list cons">
+                    <li>No access governance: Any product team can consume a domain's data field without the owner's knowledge.</li>
+                    <li>No data versioning: Product data derived from domain data has no versioned contract.</li>
+                    <!--li>domain services see unexpected traffic spikes with no SLA negotiation and no way to trace which consumers are responsible.></li-->
+                    <!--li>Domain teams can change field implementation — e.g. how income is calculated — without consumers knowing. Two income fields (self-reported vs ADP-reported) can appear on the same page with no guard, creating fragmented user experiences. Schema versioning alone won't catch this — implementation changes can be silent. Requires central tooling to detect code-level changes and propagate version bumps to consumers.<li-->
+                    <li>Resilience risk: Single point of failure across all products</li>
+                    <li>Operational overhead: On-call burden concentrated on platform team</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 2: Strategic Pivot -->
+    <div class="slide" id="slide-2">
+        <div class="slide-label">Slide 2 — Strategic Pivot</div>
+        <div class="slide-title">3-layer data governance architecture</div>
+        <div class="slide-subtitle">Combining Uber DOMA's domain ownership with Airbnb Viaduct's query optimization — with no centralized service in the critical path.</div>
+
+        <div class="card-grid cols-2" style="margin-bottom:16px">
+            <div class="card">
+                <div class="pill pill-purple">Uber DOMA</div>
+                <div class="card-title">Domain ownership &amp; gateways</div>
+                <div class="card-body">Organizes 2,200 services into 70 domains. Gateways shield consumers from churn. Extensions allow custom logic injection.</div>
+            </div>
+            <div class="card">
+                <div class="pill pill-teal">Airbnb Viaduct</div>
+                <div class="card-title">Centralized query engine</div>
+                <div class="card-body">Single GraphQL schema with team-owned modules, re-entrant resolvers, serverless transformations, and field-level observability.</div>
+            </div>
+        </div>
+
+        <div class="layers">
+            <div class="layer layer-1">
+                <div class="layer-label">Layer 1</div>
+                <div class="layer-name">Domain layer <span style="font-weight:400;font-size:12px;opacity:.6">(DOMA-inspired)</span></div>
+                <div class="layer-desc">Domain teams own raw data and expose typed schemas. Define join keys, extension points, SLA timeouts, and on-call handlers. Internal implementation hidden behind the schema contract.</div>
+            </div>
+            <div class="layer layer-2">
+                <div class="layer-label">Layer 2</div>
+                <div class="layer-name">Product layer <span style="font-weight:400;font-size:12px;opacity:.6">(GQL Extensions + Data Ownership)</span></div>
+                <div class="layer-desc">Product teams extend domain schemas with product-specific derivations. Extensions are declarative, approved by domain teams, and transformation logic is sharable.</div>
+            </div>
+            <div class="layer layer-3">
+                <div class="layer-label">Layer 3</div>
+                <div class="layer-name">Presentation layer <span style="font-weight:400;font-size:12px;opacity:.6">(Viaduct-inspired SDK)</span></div>
+                <div class="layer-desc">Platform SDK generates a resolved data graph at build time. Resolver data query, batching, fan-out and caching run as a library — no centralized service to operate.</div>
+            </div>
+        </div>
+
+        <div class="card-grid cols-2" style="margin-top:16px">
+            <div>
+                <div class="col-title">Benefits</div>
+                <ul class="item-list pros">
+                    <li>Clear ownership: domain / product / presentation</li>
+                    <li>Fine-grained access control</li>
+                    <li>Dev experience: presentation service queries data via SDK</li>
+                    <li>Failure blast radius reduced to single product</li>
+                </ul>
+            </div>
+            <div>
+                <div class="col-title">Tradeoffs &amp; mitigations</div>
+                <ul class="item-list cons">
+                    <li>SDK becomes a critical shared dep → strong versioning strategy</li>
+                    <li>Annotation ceiling in Thrift → GQL schema with custom directives</li>
+                    <li>Schema governance overhead → invest in tooling early</li>
+                    <!--trade operational complexity for governance complexity. Right trade for a small platform team-->
+                    <li>Decentralized fan-out → SDK-level instrumentation + domain SLAs</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Impact & Vision -->
+    <div class="slide" id="slide-3">
+        <div class="slide-label">Slide 3 — Impact &amp; Vision</div>
+        <div class="slide-title">GenAI-powered personalization</div>
+        <div class="slide-subtitle">The data mesh becomes an agent-aware, self-describing execution layer for AI-driven experiences.</div>
+
+        <div class="evo-stack" style="margin-bottom:24px">
+            <div class="evo-row">
+                <div class="evo-box"><b>Thrift IDL -> GraphQL schema</b><span>Source of truth and codegen</span></div>
+            </div>
+            <div style="text-align:center;color:rgba(255,255,255,.2);font-size:16px;line-height:1">↓</div>
+            <div class="evo-row">
+                <div class="evo-box"><b>Federated Data SDK</b><span>Execution layer — fan-out, batching, caching </span></div>
+            </div>
+            <div style="text-align:center;color:rgba(255,255,255,.2);font-size:16px;line-height:1">↓</div>
+            <div class="evo-row">
+                <div class="evo-box"><b>GraphQL facade</b><span>Request layer — query interface, schema introspection, dependency resolution</span></div>
+            </div>
+            <div style="text-align:center;color:rgba(255,255,255,.2);font-size:16px;line-height:1">↓</div>
+            <div class="evo-row">
+                <div class="evo-box" style="border-color:rgba(127,119,221,.4);background:rgba(127,119,221,.1)"><b style="color:#afa9ec">Agentic data access</b><span>Intent layer — LLM comprehends schema, generates queries</span></div>
+            </div>
+        </div>
+
+        <div class="phases">
+            <div class="phase">
+                <div class="phase-num">Phase 1</div>
+                <div class="phase-title">Federated Content Targeting</div>
+                <ul class="phase-items">
+                    <li>Federated rule engine</li>
+                    <li>Runtime data SDK core and obs</li>
+                    <li>Build-time codegen (typed client code with recipes)</li>
+                    <li>Cross-runtime data callback</li>
+                    <!--li>Build-time codegen (typed client code)</li>
+                    <li>Observability instrumentation</li-->
+                </ul>
+            </div>
+            <div class="phase">
+                <div class="phase-num">Phase 2</div>
+                <div class="phase-title">Governance toolchain</div>
+                <ul class="phase-items">
+                    <li>Design annotation vocabulary spec</li>
+                    <li>Schema extension and access management</li>
+                    <li>Schema change control</li>
+                    <li>Schema Codegen + Linting + versioning enforcement</li>
+                </ul>
+            </div>
+            <div class="phase">
+                <div class="phase-num">Phase 3</div>
+                <div class="phase-title">GenAI Onboarding</div>
+                <ul class="phase-items">
+                    <li>GraphQL facade on top of data SDK</li>
+                    <li>Schema introspection for LLM agents</li>
+                    <li>Semantic query capability</li>
+                    <li>Runtime query resolver</li>
+                </ul>
+            </div>
+            <div class="phase">
+                <div class="phase-num">Phase 4</div>
+                <div class="phase-title">Presentation Layer Adoption</div>
+                <ul class="phase-items">
+                    <li>3 layered data governance enforcement</li>
+                    <li>legacy registry migration &amp; team onboarding</li>
+                    <li>content targeting migration</li>
+                    <li>...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Schema Example -->
+    <div class="slide" id="slide-4">
+        <div class="slide-label">Appendix — Schema Design</div>
+        <div class="slide-title">3-layer schema in practice</div>
+        <div class="slide-subtitle">Thrift stays the RPC wire contract. GraphQL — generated from Thrift — is the canonical governance layer stored in the schema registry, with directives encoding ownership, versioning, and extension rules.</div>
+
+        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+
+            <!-- Layer 1 -->
+            <div class="layer layer-1" style="padding:0;overflow:hidden">
+                <div style="padding:12px 16px 8px;display:flex;align-items:baseline;gap:10px">
+                    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#afa9ec">Layer 1 — Domain</span>
+                    <span style="font-size:12px;color:rgba(255,255,255,.4)">codegen from Credit Report service IDL · owned by credit-eco-team</span>
+                </div>
+                <div style="background:rgba(0,0,0,.25);padding:12px 16px;font-family:'Courier New',monospace;font-size:11.5px;line-height:1.8;color:rgba(255,255,255,.7);overflow-x:auto">
+                    <span style="color:#afa9ec">type</span> <span style="color:#fff">CreditReport</span> <span style="color:#5dcaa5">@domain</span>(<span style="color:#ef9f27">owner</span>: <span style="color:#f09595">"credit-eco-team"</span>, <span style="color:#ef9f27">sla</span>: {<span style="color:#ef9f27">p95LatencyMs</span>: <span style="color:#ef9f27">80</span>}, <span style="color:#ef9f27">extensions</span>: [<span style="color:#f09595">"core-product-team"</span>]) {<br/>
+                    &nbsp;&nbsp;creditScore: Int &nbsp;<span style="color:#5dcaa5">@field</span>(<span style="color:#ef9f27">joinKey</span>: <span style="color:#f09595">"userId"</span>, <span style="color:#ef9f27">version</span>: <span style="color:#f09595">"1.0.0"</span>)<br/>
+                   }
+                </div>
+                <div style="padding:8px 16px 12px;font-size:11.5px;color:rgba(255,255,255,.4);line-height:1.5">
+                    <span style="color:#afa9ec">version</span> is bumped by domain team whenever implementation changes — the schema needs to be backward compatible. CI enforces the bump on every code change to fields backing this type monitored by AI.
+                </div>
+            </div>
+
+            <div style="text-align:center;font-size:13px;color:#afa9ec">↓ product team registers extension, approved by domain team</div>
+
+            <!-- Layer 2 -->
+            <div class="layer layer-2" style="padding:0;overflow:hidden">
+                <div style="padding:12px 16px 8px;display:flex;align-items:baseline;gap:10px">
+                    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5dcaa5">Layer 2 — Product</span>
+                    <span style="font-size:12px;color:rgba(255,255,255,.4)">Core Product team · extends CreditReport.creditScore</span>
+                </div>
+                <div style="background:rgba(0,0,0,.25);padding:12px 16px;font-family:'Courier New',monospace;font-size:11.5px;line-height:1.8;color:rgba(255,255,255,.7);overflow-x:auto">
+                    <span style="color:#afa9ec">extend type</span> <span style="color:#fff">CreditReport</span> {<br/>
+                    &nbsp;&nbsp;creditProfile: CreditProfile <span style="color:#5dcaa5">@extension</span>(<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#ef9f27">dependsOn</span>: [<span style="color:#f09595">"CreditReport.creditScore@1.0.0"</span>]<br/>
+                    &nbsp;&nbsp;)<br/>
+                    }<br/>
+                    <br/>
+                    <span style="color:#afa9ec">type</span> <span style="color:#fff">CreditProfile</span> {<br/>
+                    &nbsp;&nbsp;equifaxCreditScore: Int <span style="color:#5dcaa5">@derived</span>(<span style="color:#ef9f27">source</span>: <span style="color:#f09595">"CreditReport.creditScore"</span>, <span style="color:#ef9f27">fact</span>: <span style="color:#f09595">"creditScore"</span>, <span style="color:#ef9f27">recipe</span>: <span style="color:#f09595">"@ck/fact-cookbook@1.0.0/score-converter"</span>)<br/>
+<!--                    &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#f09595">"CreditReport.creditScore"</span><br/>-->
+<!--                    &nbsp;&nbsp;)<br/>-->
+                    }
+                </div>
+                <div style="padding:8px 16px 12px;font-size:11.5px;color:rgba(255,255,255,.4);line-height:1.5">
+                    <span style="color:#5dcaa5">dependsOn</span> pins domain field versions. If <span style="color:rgba(255,255,255,.6)">CreditReport.creditScore</span> bumps to 1.0.1, the registry flags this extension as stale and notifies the core product team before it reaches production.
+                </div>
+            </div>
+
+            <div style="text-align:center;font-size:13px;color:#afa9ec">↓ SDK resolves fetch plan at runtime</div>
+
+            <!-- Layer 3 -->
+            <div class="layer layer-3" style="padding:0;overflow:hidden">
+                <div style="padding:12px 16px 8px;display:flex;align-items:baseline;gap:10px">
+                    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#ef9f27">Layer 3 — Presentation</span>
+                    <span style="font-size:12px;color:rgba(255,255,255,.4)">query declared in Dashboard service and mapped to facts in registry</span>
+                </div>
+                <div style="background:rgba(0,0,0,.25);padding:12px 16px;font-family:'Courier New',monospace;font-size:11.5px;line-height:1.8;color:rgba(255,255,255,.7);overflow-x:auto">
+                    <span style="color:#afa9ec">query</span> <span style="color:#fff">Dashboard</span>(<span style="color:#ef9f27">$userId</span>: ID!) {<br/>
+                    &nbsp;&nbsp;creditReport(<span style="color:#ef9f27">userId</span>: <span style="color:#ef9f27">$userId</span>) {<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;creditProfile {<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;equifaxCreditScore<br/>
+                    &nbsp;&nbsp;&nbsp;&nbsp;}<br/>
+                    &nbsp;&nbsp;}<br/>
+                    }<br/>
+                    <!--span style="color:rgba(255,255,255,.35)"># SDK codegen produces at build time:</span><br/>
+                    <span style="color:rgba(255,255,255,.35)"># 1. Batch fetch totalDebt + creditLimit → single RPC to credit-report service</span><br/>
+                    <span style="color:rgba(255,255,255,.35)"># 2. Apply creditUtilization = totalDebt / creditLimit locally</span><br/>
+                    <span style="color:rgba(255,255,255,.35)"># 3. Plan is baked into generated code — no runtime schema discovery</span-->
+                </div>
+            </div>
+        </div>
+
+        <!-- Governance table -->
+        <!--div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.35);margin-bottom:8px">How the registry enforces governance</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="card" style="padding:10px 12px">
+                <div class="card-title" style="font-size:12px">Unknown consumers</div>
+                <div class="card-body" style="font-size:11.5px">Presentation queries must register against the registry — no anonymous consumption</div>
+            </div>
+            <div class="card" style="padding:10px 12px">
+                <div class="card-title" style="font-size:12px">Silent implementation drift</div>
+                <div class="card-body" style="font-size:11.5px">Domain team bumps <code style="font-size:11px;color:#afa9ec">@field(version:)</code> on code change; registry alerts all <code style="font-size:11px;color:#5dcaa5">dependsOn</code> consumers — <span style="color:#f09595">CI tooling required (Phase 3)</span></div>
+            </div>
+            <div class="card" style="padding:10px 12px">
+                <div class="card-title" style="font-size:12px">Two incomes on one page</div>
+                <div class="card-body" style="font-size:11.5px"><code style="font-size:11px;color:#5dcaa5">@derived(semanticTag:)</code> enforced at query validation — only one field per tag per page composition</div>
+            </div>
+            <div class="card" style="padding:10px 12px">
+                <div class="card-title" style="font-size:12px">Unapproved extensions</div>
+                <div class="card-body" style="font-size:11.5px"><code style="font-size:11px;color:#5dcaa5">@extensionPoint(approvedExtenders:)</code> gates which product teams can extend a domain type</div>
+            </div>
+        </div-->
+    </div>
+</div>
+
+<div class="progress-bar">
+    <div class="progress-fill" id="progress" style="width:25%"></div>
+</div>
+
+<script>
+    let cur = 0;
+    const total = 5;
+    function goTo(n){
+        document.getElementById('slide-'+cur).classList.remove('active');
+        document.querySelectorAll('.dot')[cur].classList.remove('active');
+        cur = n;
+        document.getElementById('slide-'+cur).classList.add('active');
+        document.querySelectorAll('.dot')[cur].classList.add('active');
+        document.getElementById('prev-btn').disabled = cur===0;
+        document.getElementById('next-btn').disabled = cur===total-1;
+        document.getElementById('progress').style.width = ((cur+1)/total*100)+'%';
+    }
+    function next(){if(cur<total-1)goTo(cur+1)}
+    function prev(){if(cur>0)goTo(cur-1)}
+    document.addEventListener('keydown',e=>{
+        if(e.key==='ArrowRight'||e.key==='ArrowDown')next();
+        if(e.key==='ArrowLeft'||e.key==='ArrowUp')prev();
+    });
+</script>
+</body>
+</html>
